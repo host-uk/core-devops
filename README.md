@@ -4,20 +4,36 @@ This repository bootstraps a complete Host UK development environment.
 
 ## Quick Start
 
+### One-liner (macOS/Linux)
+```bash
+git clone git@github.com:host-uk/core-devops.git && cd core-devops && make setup
+```
+
+### Step by step
 ```bash
 # 1. Clone this repo
 git clone git@github.com:host-uk/core-devops.git
 cd core-devops
 
-# 2. Check your environment
-core doctor
+# 2. Install dependencies and core CLI
+make setup
 
-# 3. Clone all packages
-core setup
+# Or manually:
+./scripts/install-deps.sh   # Install go, gh, php, node, etc.
+./scripts/install-core.sh   # Build and install core CLI
 
-# 4. Start developing
+# 3. Start developing
 cd packages/core-php
 composer install
+```
+
+### Windows (PowerShell as Admin)
+```powershell
+git clone git@github.com:host-uk/core-devops.git
+cd core-devops
+.\scripts\install-deps.ps1   # Install via Chocolatey
+.\scripts\install-core.ps1   # Build and install core CLI
+core setup                   # Clone all repos
 ```
 
 ## Prerequisites
