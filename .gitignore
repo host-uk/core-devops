@@ -2,6 +2,9 @@
 packages/*
 !packages/.gitkeep
 
+# Core CLI cache (transient data)
+.core/
+
 # IDE
 .idea/
 .vscode/
