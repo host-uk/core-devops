@@ -1,51 +1,75 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code when working in the developer workspace.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What This Is
 
-This is the **developer workspace orchestrator** for Host UK. It contains:
-- `repos.yaml` - Registry of all packages
-- `packages/` - Directory where repos are cloned (git-ignored)
+This is the **developer workspace orchestrator** for Host UK - a federated monorepo containing 18 Laravel packages. This repo contains only configuration and setup scripts; actual code lives in `packages/core-*/`, each with its own CLAUDE.md.
 
-The actual code lives in `packages/core-*/`. Each has its own CLAUDE.md.
+## Initial Setup
+
+```bash
+# One-liner (macOS/Linux)
+git clone git@github.com:host-uk/core-devops.git && cd core-devops && make setup
+
+# Or step by step
+make install-deps       # Install go, gh, php, node, pnpm
+make install-core       # Build/install core CLI to ~/.local/bin
+make clone              # Clone all repos into packages/
+```
 
 ## Commands
 
 ```bash
-# Workspace setup
-core setup              # Clone all repos
-core doctor             # Check environment
+# Environment
+make setup              # Full setup (deps + core + clone)
+core doctor             # Check environment (requires: git, gh, php 8.3+, composer, node 20+, pnpm)
+core doctor --fix       # Attempt to fix issues
 
-# Multi-repo operations
-core health             # Quick status
-core work               # Full workflow
-core commit             # Claude-assisted commits
-core push               # Push changes
-core pull               # Pull updates
+# Multi-repo workflow
+core health             # Quick status summary
+core work               # Full workflow: status → commit → push
+core work --status      # Status table only (no commit/push)
+core commit             # Claude-assisted commits for dirty repos
+core commit --all       # Commit all without prompting
+core push               # Push repos with unpushed commits
+core pull               # Pull repos that are behind
 
-# GitHub integration
-core issues             # List issues
-core reviews            # List PRs
-core ci                 # CI status
+# GitHub integration (requires gh CLI)
+core issues             # List open issues across repos
+core issues --assignee @me
+core reviews            # List PRs with review status
+core ci                 # GitHub Actions workflow status
 
 # Analysis
-core impact core-php    # Dependency analysis
+core impact core-php    # Show what depends on core-php
 ```
 
 ## Working on Packages
 
 ```bash
 cd packages/core-php
-composer test           # Run tests
-composer lint           # Fix style
+composer install
+composer test           # Run Pest tests
+composer lint           # Fix code style (Pint)
+npm run dev             # Vite dev server (if has frontend)
 ```
+
+## Package Types (repos.yaml)
+
+| Type | Examples | Purpose |
+|------|----------|---------|
+| foundation | core-php | Base framework (no dependencies) |
+| module | core-tenant, core-admin, core-api, core-mcp | Infrastructure services |
+| product | core-bio, core-social, core-analytics | User-facing applications |
+| template | core-template | Starter for new projects |
+| meta | core-devops | This workspace repo |
 
 ## This Is a Workspace, Not Code
 
-Don't add code here. This repo only contains:
-- Configuration files
-- The `packages/` directory structure
-- Documentation
+Don't add code here. All actual development happens in `packages/core-*/`.
 
-All actual development happens in `packages/core-*/`.
+This repo manages:
+- `repos.yaml` - Package registry with dependencies
+- `packages/` - Cloned repositories (git-ignored)
+- `scripts/` - Setup scripts for macOS/Linux/Windows

@@ -1,7 +1,7 @@
 # Host UK Developer Workspace
 # Run `make setup` to bootstrap your environment
 
-CORE_REPO := github.com/Snider/Core
+CORE_REPO := github.com/host-uk/core
 CORE_VERSION := latest
 INSTALL_DIR := $(HOME)/.local/bin
 
