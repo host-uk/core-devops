@@ -42,6 +42,16 @@
 - [x] core docs sync tested
 - [x] free-tier-services.md
 
+### Container Images (core-images)
+- [x] docker-compose.yml + devcontainer.json (packages/ mount)
+- [x] Dual-registry workflow: GHCR + Docker Hub (lthn/*)
+- [x] DOCKERHUB_USERNAME/TOKEN secrets (org-wide)
+- [ ] Fix Dockerfile Python build (#2 - tiktoken, tree-sitter)
+- [ ] Merge dev → main to publish images
+
+### Core CLI Issues
+- [x] #50 - linuxkit double-dash flags fix
+
 ## 🔲 Pending (Core CLI Issues Created)
 
 - [ ] #46 - docs sync ignores packages_dir
@@ -54,5 +64,6 @@
 - [ ] Merge dev → main on repos to deploy docs
 - [ ] Recruit first 10 contributors
 - [ ] Rotate PROJECT_TOKEN (was shared in chat)
+- [ ] Rotate DOCKERHUB_TOKEN (was shared in chat)
 - [x] Add workflow to remaining PHP repos (8 repos)
 - [ ] Set up external OSS project scanning
