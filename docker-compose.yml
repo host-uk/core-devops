@@ -1,0 +1,29 @@
+# Core Developer Environment
+# Mounts packages/ as /workspace in the container
+
+services:
+  dev:
+    image: ghcr.io/host-uk/core-images/developer:latest
+    container_name: core-dev
+    hostname: core-dev
+    stdin_open: true
+    tty: true
+    volumes:
+      # Mount packages directory as workspace
+      - ./packages:/workspace
+      # Persist home directory configs
+      - dev-home:/root
+      # SSH keys for git operations
+      - ~/.ssh:/root/.ssh:ro
+      # Git config
+      - ~/.gitconfig:/root/.gitconfig:ro
+    environment:
+      - TERM=xterm-256color
+      - EDITOR=nvim
+    working_dir: /workspace
+    # Keep container running
+    command: ["/bin/zsh"]
+
+volumes:
+  dev-home:
+    name: core-dev-home

@@ -1,0 +1,33 @@
+{
+  "name": "Core Developer",
+  "image": "ghcr.io/host-uk/core-images/developer:latest",
+  
+  "workspaceMount": "source=${localWorkspaceFolder}/packages,target=/workspace,type=bind",
+  "workspaceFolder": "/workspace",
+  
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/root/.ssh,type=bind,readonly",
+    "source=${localEnv:HOME}/.gitconfig,target=/root/.gitconfig,type=bind,readonly",
+    "source=core-dev-home,target=/root,type=volume"
+  ],
+  
+  "containerEnv": {
+    "TERM": "xterm-256color",
+    "EDITOR": "nvim"
+  },
+  
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bmewburn.vscode-intelephense-client",
+        "golang.go",
+        "ms-python.python",
+        "rust-lang.rust-analyzer"
+      ]
+    }
+  },
+  
+  "postCreateCommand": "echo 'Core Developer ready. Workspace: /workspace (packages/)'",
+  
+  "remoteUser": "root"
+}
