@@ -3,15 +3,54 @@ set -e
 
 # Install system dependencies for Host UK development
 # Supports: macOS (brew), Linux (apt/dnf), Windows (choco via WSL)
+#
+# SECURITY NOTES:
+# - External install scripts (Homebrew, NodeSource) are downloaded over HTTPS
+# - Go binary is verified via SHA256 checksum
+# - Composer installer is verified via SHA256 checksum
+# - Consider auditing external scripts before running in sensitive environments
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Pinned versions and checksums for security
+GO_VERSION="1.22.0"
+GO_AMD64_SHA256="f6c8a87aa03b92c4b0bf3d558e28ea03006eb29db78917daec5cfb6ec1046265"
+COMPOSER_EXPECTED_SIG="dac665fdc30fdd8ec78b38b9800061b4150413ff2e3b6f88543c636f7cd84f6db9189d43a81e5503cda447da73c7e5b6"
+
 info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+
+# Compute SHA256 hash (cross-platform)
+compute_sha256() {
+    local file=$1
+    if command -v sha256sum &> /dev/null; then
+        sha256sum "$file" | cut -d' ' -f1
+    elif command -v shasum &> /dev/null; then
+        shasum -a 256 "$file" | cut -d' ' -f1
+    else
+        error "No SHA256 tool available (need sha256sum or shasum)"
+    fi
+}
+
+# Verify SHA256 hash of downloaded file
+verify_hash() {
+    local file=$1
+    local expected_hash=$2
+    local actual_hash
+
+    actual_hash=$(compute_sha256 "$file")
+
+    if [[ "${actual_hash,,}" != "${expected_hash,,}" ]]; then
+        rm -f "$file"
+        error "Hash verification failed! Expected: $expected_hash, Got: $actual_hash"
+    fi
+
+    info "Hash verification passed"
+}
 
 # Detect OS
 detect_os() {
@@ -29,6 +68,9 @@ has() {
 }
 
 # Install Homebrew (macOS/Linux)
+# NOTE: Homebrew's install script changes frequently, making checksum verification impractical.
+# The script is fetched over HTTPS from GitHub. For high-security environments,
+# consider auditing the script manually before running.
 install_brew() {
     if has brew; then
         info "Homebrew already installed"
@@ -36,7 +78,18 @@ install_brew() {
     fi
 
     info "Installing Homebrew..."
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    warn "This downloads and executes a script from GitHub. Review at: https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh"
+
+    # Download to temp file first (allows manual inspection if needed)
+    local temp_script
+    temp_script=$(mktemp "${TMPDIR:-/tmp}/brew-install.XXXXXXXXXX.sh")
+    curl -fsSL -o "$temp_script" https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh || {
+        rm -f "$temp_script"
+        error "Failed to download Homebrew installer"
+    }
+
+    /bin/bash "$temp_script"
+    rm -f "$temp_script"
 
     # Add to PATH for this session
     if [[ -f /opt/homebrew/bin/brew ]]; then
@@ -115,11 +168,24 @@ setup_linux_apt() {
     if ! has go; then
         info "Installing Go..."
         sudo apt-get install -y golang-go || {
-            # Fallback to manual install for newer version
-            curl -LO https://go.dev/dl/go1.22.0.linux-amd64.tar.gz
+            # Fallback to manual install for newer version with integrity verification
+            local go_tarball="go${GO_VERSION}.linux-amd64.tar.gz"
+            local go_url="https://go.dev/dl/${go_tarball}"
+            local temp_file
+            temp_file=$(mktemp "${TMPDIR:-/tmp}/go.XXXXXXXXXX.tar.gz")
+
+            info "Downloading Go $GO_VERSION..."
+            curl -fsSL -o "$temp_file" "$go_url" || {
+                rm -f "$temp_file"
+                error "Failed to download Go"
+            }
+
+            info "Verifying Go download integrity..."
+            verify_hash "$temp_file" "$GO_AMD64_SHA256"
+
             sudo rm -rf /usr/local/go
-            sudo tar -C /usr/local -xzf go1.22.0.linux-amd64.tar.gz
-            rm go1.22.0.linux-amd64.tar.gz
+            sudo tar -C /usr/local -xzf "$temp_file"
+            rm -f "$temp_file"
             export PATH=$PATH:/usr/local/go/bin
         }
     fi
@@ -127,17 +193,47 @@ setup_linux_apt() {
     # PHP
     apt_install php
 
-    # Composer
+    # Composer (with installer signature verification)
     if ! has composer; then
         info "Installing Composer..."
-        curl -sS https://getcomposer.org/installer | php
-        sudo mv composer.phar /usr/local/bin/composer
+        local temp_dir
+        temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/composer.XXXXXXXXXX")
+        chmod 700 "$temp_dir"
+
+        # Download installer
+        curl -fsSL -o "$temp_dir/composer-setup.php" https://getcomposer.org/installer
+
+        # Verify installer signature (SHA384)
+        local actual_sig
+        actual_sig=$(php -r "echo hash_file('sha384', '$temp_dir/composer-setup.php');")
+        if [[ "$actual_sig" != "$COMPOSER_EXPECTED_SIG" ]]; then
+            rm -rf "$temp_dir"
+            error "Composer installer signature verification failed!"
+        fi
+        info "Composer installer signature verified"
+
+        # Run installer
+        php "$temp_dir/composer-setup.php" --install-dir="$temp_dir"
+        sudo mv "$temp_dir/composer.phar" /usr/local/bin/composer
+        rm -rf "$temp_dir"
     fi
 
-    # Node
+    # Node (via NodeSource)
+    # NOTE: NodeSource setup script changes frequently, making checksum verification impractical.
+    # For high-security environments, consider using nvm or building from source.
     if ! has node; then
         info "Installing Node.js..."
-        curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+        warn "This downloads and executes a script from NodeSource. Review at: https://deb.nodesource.com/setup_20.x"
+
+        local temp_script
+        temp_script=$(mktemp "${TMPDIR:-/tmp}/nodesource-setup.XXXXXXXXXX.sh")
+        curl -fsSL -o "$temp_script" https://deb.nodesource.com/setup_20.x || {
+            rm -f "$temp_script"
+            error "Failed to download NodeSource setup script"
+        }
+
+        sudo -E bash "$temp_script"
+        rm -f "$temp_script"
         sudo apt-get install -y nodejs
     fi
 
