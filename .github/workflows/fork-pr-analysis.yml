@@ -1,0 +1,37 @@
+name: PR Analysis (Fork)
+
+# This workflow runs on the FORK's resources, not ours
+# Contributors get free GitHub Actions minutes
+# Microsoft/GitHub subsidizes the compute
+
+on:
+  pull_request_target:
+    types: [opened, synchronize]
+
+jobs:
+  # Lightweight check on our side - just verify the fork did the work
+  verify-fork-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check fork CI status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: checks } = await github.rest.checks.listForRef({
+              owner: context.payload.pull_request.head.repo.owner.login,
+              repo: context.payload.pull_request.head.repo.name,
+              ref: context.payload.pull_request.head.sha
+            });
+            
+            const passed = checks.check_runs.filter(c => c.conclusion === 'success');
+            const failed = checks.check_runs.filter(c => c.conclusion === 'failure');
+            
+            console.log(`Fork CI: ${passed.length} passed, ${failed.length} failed`);
+            
+            if (failed.length > 0) {
+              core.setFailed('Fork CI has failures - contributor must fix on their fork');
+            }
+
+---
+# This file goes in the TEMPLATE so forks inherit it
+# The heavy work runs on contributor's GitHub Actions allowance

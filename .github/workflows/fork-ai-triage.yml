@@ -1,0 +1,120 @@
+name: AI Triage (Fork Compute)
+
+# Strategy: Heavy AI analysis runs on contributor's fork
+# They get free GitHub Copilot / Actions minutes
+# We only do lightweight verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # Runs on contributor's GitHub Actions allowance
+  ai-triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get changed files
+        id: changes
+        run: |
+          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | head -50)
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$FILES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "count=$(echo "$FILES" | wc -l)" >> $GITHUB_OUTPUT
+      
+      - name: Categorize changes
+        id: categorize
+        run: |
+          # Determine what type of changes (runs on fork's compute)
+          PHP_COUNT=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -c '\.php$' || echo 0)
+          GO_COUNT=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -c '\.go$' || echo 0)
+          JS_COUNT=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -cE '\.(js|ts)$' || echo 0)
+          DOC_COUNT=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -cE '\.(md|txt)$' || echo 0)
+          
+          echo "php=$PHP_COUNT" >> $GITHUB_OUTPUT
+          echo "go=$GO_COUNT" >> $GITHUB_OUTPUT
+          echo "js=$JS_COUNT" >> $GITHUB_OUTPUT
+          echo "docs=$DOC_COUNT" >> $GITHUB_OUTPUT
+          
+          # Suggest labels
+          LABELS=""
+          [ "$PHP_COUNT" -gt 0 ] && LABELS="$LABELS,lang:php"
+          [ "$GO_COUNT" -gt 0 ] && LABELS="$LABELS,lang:go"
+          [ "$JS_COUNT" -gt 0 ] && LABELS="$LABELS,lang:js"
+          [ "$DOC_COUNT" -gt 0 ] && LABELS="$LABELS,type:docs"
+          
+          echo "labels=${LABELS#,}" >> $GITHUB_OUTPUT
+
+      - name: Security quick scan
+        run: |
+          # Quick security checks (contributor's compute)
+          echo "Checking for secrets..."
+          
+          # Check for common secret patterns
+          if git diff origin/${{ github.base_ref }}...HEAD | grep -iE '(api_key|secret|password|token)\s*[:=]' | grep -v 'example\|placeholder\|xxx'; then
+            echo "::warning::Possible secrets detected in diff"
+          fi
+          
+          # Check for .env files
+          if git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '\.env$'; then
+            echo "::error::Environment file changes detected - review carefully"
+          fi
+
+      - name: Generate triage summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const changes = `${{ steps.changes.outputs.files }}`.split('\n').filter(f => f);
+            const labels = '${{ steps.categorize.outputs.labels }}'.split(',').filter(l => l);
+            
+            const summary = `## 🤖 AI Triage Summary
+            
+            **Files changed:** ${changes.length}
+            **Languages detected:** ${labels.filter(l => l.startsWith('lang:')).map(l => l.replace('lang:', '')).join(', ') || 'none'}
+            
+            ### Suggested labels
+            ${labels.map(l => '`' + l + '`').join(' ') || '_No suggestions_'}
+            
+            ### Changed files
+            <details>
+            <summary>View ${changes.length} files</summary>
+            
+            \`\`\`
+            ${changes.join('\n')}
+            \`\`\`
+            </details>
+            
+            ---
+            _This analysis ran on the contributor's GitHub Actions allowance._ 🆓
+            `;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: summary
+            });
+
+      - name: Apply suggested labels
+        if: steps.categorize.outputs.labels != ''
+        uses: actions/github-script@v7
+        continue-on-error: true
+        with:
+          script: |
+            const labels = '${{ steps.categorize.outputs.labels }}'.split(',').filter(l => l);
+            if (labels.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: labels
+              });
+            }

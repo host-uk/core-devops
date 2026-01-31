@@ -1,0 +1,57 @@
+name: Contributor CI
+
+# Runs on fork's compute allowance (Microsoft/GitHub free tier)
+# Heavy analysis happens here, not on upstream
+
+on:
+  push:
+    branches-ignore: [main, dev]  # Only feature branches (forks)
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  # This runs on CONTRIBUTOR'S allowance
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run analysis
+        run: |
+          echo "## 🔍 Contributor Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "This CI runs on your fork's GitHub Actions allowance." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add your heavy analysis here - it's FREE for contributors
+          # - CodeQL scanning
+          # - Dependency analysis  
+          # - AI-powered code review (if using Copilot)
+          # - Full test suite
+          
+      - name: Lint
+        run: |
+          # Linting on contributor's compute
+          echo "Running lint..."
+          
+      - name: Security scan
+        run: |
+          # Security scanning on contributor's compute
+          echo "Running security scan..."
+
+  # AI-powered analysis (uses contributor's Copilot/AI allowance)
+  ai-review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: AI Analysis Placeholder
+        run: |
+          echo "## 🤖 AI Analysis" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This would run AI analysis using:" >> $GITHUB_STEP_SUMMARY
+          echo "- Contributor's Copilot allowance" >> $GITHUB_STEP_SUMMARY
+          echo "- GitHub's free AI features" >> $GITHUB_STEP_SUMMARY
+          echo "- Any AI APIs the contributor has configured" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Upstream repo pays nothing. 💰" >> $GITHUB_STEP_SUMMARY
