@@ -55,12 +55,14 @@ function Build-FromSource {
 
         Write-Info "Building core CLI..."
         Push-Location $cloneDir
-        go build -o core.exe .
-        if ($LASTEXITCODE -ne 0) {
+        try {
+            go build -o core.exe .
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "Go build failed"
+            }
+        } finally {
             Pop-Location
-            Write-Err "Go build failed"
         }
-        Pop-Location
 
         New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
         Move-Item (Join-Path $cloneDir "core.exe") (Join-Path $InstallDir "core.exe") -Force
