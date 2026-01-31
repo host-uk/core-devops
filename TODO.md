@@ -54,5 +54,5 @@
 - [ ] Merge dev → main on repos to deploy docs
 - [ ] Recruit first 10 contributors
 - [ ] Rotate PROJECT_TOKEN (was shared in chat)
-- [ ] Add workflow to remaining PHP repos
+- [x] Add workflow to remaining PHP repos (8 repos)
 - [ ] Set up external OSS project scanning
