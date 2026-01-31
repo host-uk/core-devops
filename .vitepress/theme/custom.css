@@ -1,0 +1,33 @@
+.dev-banner {
+  background: linear-gradient(90deg, #7c3aed 0%, #2563eb 100%);
+  color: white;
+  padding: 0.5rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.dev-banner a {
+  color: #fbbf24;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.dev-banner a:hover {
+  color: #fcd34d;
+}
+
+.VPNav {
+  top: 36px !important;
+}
+
+.VPSidebar {
+  top: calc(var(--vp-nav-height) + 36px) !important;
+  height: calc(100vh - var(--vp-nav-height) - 36px) !important;
+}
+
+.VPContent {
+  padding-top: 36px;
+}
