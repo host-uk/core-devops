@@ -48,8 +48,10 @@ if !errorlevel! equ 0 (
     echo ERROR: LOCALAPPDATA contains invalid shell characters
     goto :error
 )
-echo !LOCALAPPDATA! | findstr /c:"%%" >nul
-if !errorlevel! equ 0 (
+REM Check for percent signs (both single and double)
+set "TEMP_CHECK=!LOCALAPPDATA!"
+set "TEMP_CHECK=!TEMP_CHECK:%%=!"
+if not "!TEMP_CHECK!"=="!LOCALAPPDATA!" (
     echo ERROR: LOCALAPPDATA contains percent signs
     goto :error
 )

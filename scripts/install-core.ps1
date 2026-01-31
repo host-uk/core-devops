@@ -69,9 +69,14 @@ function Test-SecureDirectory {
         return $true  # Directory doesn't exist yet, will be created
     }
 
-    $dirInfo = Get-Item $Path -Force
+    # Primary check: use fsutil for reliable reparse point detection (matches batch script)
+    $fsutilResult = & fsutil reparsepoint query $Path 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        Write-Err "Directory '$Path' is a reparse point (symlink or junction). Possible symlink attack detected."
+    }
 
-    # Check for symlinks/junctions
+    # Fallback: check .NET attributes
+    $dirInfo = Get-Item $Path -Force
     if ($dirInfo.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
         Write-Err "Directory '$Path' is a symbolic link or junction. Possible symlink attack detected."
     }
