@@ -3,7 +3,7 @@
 
 $ErrorActionPreference = "Stop"
 
-$Repo = "Snider/Core"
+$Repo = "host-uk/core"
 $InstallDir = "$env:LOCALAPPDATA\Programs\core"
 
 function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Green }
@@ -17,7 +17,7 @@ function Test-Command($cmd) {
 # Download pre-built binary
 function Download-Binary {
     $arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
-    $url = "https://github.com/$Repo/releases/latest/download/core-windows-$arch.exe"
+    $url = "https://github.com/$Repo/releases/download/dev/core-windows-$arch.exe"
 
     Write-Info "Attempting to download pre-built binary..."
     Write-Info "URL: $url"
@@ -39,18 +39,20 @@ function Build-FromSource {
         Write-Err "Go is required to build from source. Run '.\scripts\install-deps.ps1' first"
     }
 
-    $tmpdir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
+    $tmpdir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+    New-Item -ItemType Directory -Force -Path $tmpdir | Out-Null
 
     Write-Info "Cloning $Repo..."
-    git clone --depth 1 "https://github.com/$Repo.git" "$tmpdir\Core"
+    $cloneDir = Join-Path $tmpdir "Core"
+    git clone --depth 1 "https://github.com/$Repo.git" $cloneDir
 
     Write-Info "Building core CLI..."
-    Push-Location "$tmpdir\Core"
-    go build -o core.exe ./cmd/core
+    Push-Location $cloneDir
+    go build -o core.exe .
     Pop-Location
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Move-Item "$tmpdir\Core\core.exe" "$InstallDir\core.exe" -Force
+    Move-Item (Join-Path $cloneDir "core.exe") (Join-Path $InstallDir "core.exe") -Force
 
     Remove-Item -Recurse -Force $tmpdir
     Write-Info "Built and installed to $InstallDir\core.exe"
