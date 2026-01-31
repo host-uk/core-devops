@@ -1,96 +1,158 @@
 # Host UK Developer Workspace
 
-This repository bootstraps a complete Host UK development environment.
+This repository is the **unified entry point** for Host UK development. One command sets up your entire environment.
 
 ## Quick Start
 
-### One-liner (macOS/Linux)
 ```bash
 git clone git@github.com:host-uk/core-devops.git && cd core-devops && make setup
 ```
 
-### Step by step
+**Windows (PowerShell as Admin):**
+```powershell
+git clone git@github.com:host-uk/core-devops.git; cd core-devops; .\scripts\install-deps.ps1; .\scripts\install-core.ps1; core setup
+```
+
+## What Happens
+
+`make setup` does three things:
+
+1. **Installs dependencies** - PHP 8.3+, Composer, Node 20+, pnpm, GitHub CLI
+2. **Installs the `core` CLI** - Multi-repo management tool
+3. **Clones all packages** - Into `packages/` (foundation and modules by default)
+
+After setup, run `core doctor` to verify everything is working.
+
+## What's Next
+
+You're now ready to develop. The workspace starts with `core-php` as the active package.
+
 ```bash
-# 1. Clone this repo
-git clone git@github.com:host-uk/core-devops.git
-cd core-devops
+# Check your environment
+core doctor
 
-# 2. Install dependencies and core CLI
-make setup
+# See workspace status
+core health
 
-# Or manually:
-./scripts/install-deps.sh   # Install go, gh, php, node, etc.
-./scripts/install-core.sh   # Build and install core CLI
+# Run tests in the active package (core-php)
+core php test
 
-# 3. Start developing
+# Switch to a different package
+# Edit .core/workspace.yaml and change "active: core-tenant"
+```
+
+To work directly in a package:
+```bash
 cd packages/core-php
 composer install
+composer test
 ```
-
-### Windows (PowerShell as Admin)
-```powershell
-git clone git@github.com:host-uk/core-devops.git
-cd core-devops
-.\scripts\install-deps.ps1   # Install via Chocolatey
-.\scripts\install-core.ps1   # Build and install core CLI
-core setup                   # Clone all repos
-```
-
-## Prerequisites
-
-Run `core doctor` to check your environment. You'll need:
-
-- **Git** - Version control
-- **GitHub CLI** (`gh`) - For issues, PRs, CI status
-- **PHP 8.3+** - Laravel packages
-- **Composer** - PHP dependencies
-- **Node.js 20+** - Frontend builds
-- **pnpm** - Package manager (preferred over npm)
-
-Optional but recommended:
-- **Claude Code** - AI-assisted development
-- **Docker** - For FrankenPHP runtime
 
 ## Commands
 
+### Workspace-level
 ```bash
-core setup              # Clone all repos into packages/
-core setup --only foundation,module  # Clone specific types
-core doctor             # Check environment health
-core doctor --fix       # Attempt to fix issues
+core health             # Status summary: "18 repos │ clean │ synced"
+core work               # Full workflow: status → commit → push
+core work --status      # Status table only
+core commit             # Claude-assisted commits for dirty repos
+core push               # Push repos with unpushed commits
+core pull               # Pull repos that are behind
+```
 
-# Once set up, standard core commands work:
-core health             # Status summary
-core work               # Commit and push workflow
-core issues             # View GitHub issues
+### Active package
+```bash
+core php test           # Run Pest tests
+core php lint           # Run Pint linter
+core php dev            # Start Vite dev server
+```
+
+### GitHub integration
+```bash
+core issues             # Open issues across repos
+core issues --assignee @me
+core reviews            # PRs needing review
+core ci                 # GitHub Actions status
+```
+
+### Analysis
+```bash
+core impact core-php    # Show what depends on core-php
 ```
 
 ## Structure
 
 ```
 core-devops/
+├── .core/              # Workspace configuration
+│   ├── workspace.yaml  # Active package, paths
+│   └── plugin/         # Claude Code integration
 ├── packages/           # Cloned repositories (git-ignored)
-│   ├── core-php/
-│   ├── core-tenant/
+│   ├── core-php/       # Foundation framework
+│   ├── core-tenant/    # Multi-tenancy
+│   ├── core-admin/     # Admin panel
 │   └── ...
-├── repos.yaml          # Package registry
-└── README.md
+└── repos.yaml          # Package registry
 ```
 
-## Updating
+## Prerequisites
 
+Run `core doctor` to check your environment. Required:
+
+- **Git** - Version control
+- **GitHub CLI** (`gh`) - Issues, PRs, CI status
+- **PHP 8.3+** - Laravel packages
+- **Composer** - PHP dependencies
+- **Node.js 20+** - Frontend builds
+- **pnpm** - Package manager
+
+Optional:
+- **Claude Code** - AI-assisted development
+- **Docker** - For FrankenPHP runtime
+
+## Package Types
+
+Defined in `repos.yaml`:
+
+| Type           | Packages                                                   | Description                      |
+|----------------|------------------------------------------------------------|---------------------------------|
+| **foundation** | `core-php`                                                 | Base framework, zero dependencies |
+| **module**     | `core-tenant`, `core-admin`, `core-api`, `core-mcp`, etc.  | Infrastructure                  |
+| **product**    | `core-bio`, `core-social`, `core-analytics`, etc.          | User-facing apps                |
+| **template**   | `core-template`                                            | Starter for new projects        |
+| **meta**       | `core-devops`                                              | This workspace repo             |
+
+By default, `core setup` clones foundation and module packages. To clone specific types:
 ```bash
-core pull               # Pull updates for all repos
-core pull --all         # Pull even if not behind
+core setup --only foundation,module,product
 ```
 
 ## Troubleshooting
 
 **"core: command not found"**
-Install the Core CLI from https://github.com/Snider/Core
+```bash
+make install-core
+```
 
 **"gh: command not found"**
-Install GitHub CLI: `brew install gh` then `gh auth login`
+```bash
+brew install gh && gh auth login
+```
 
 **Clone failures**
-Check your SSH keys: `ssh -T git@github.com`
+```bash
+ssh -T git@github.com  # Verify SSH keys
+```
+
+**Missing dependencies**
+```bash
+core doctor --fix
+```
+
+## Documentation
+
+- **This repo's CLAUDE.md** - Guidance for Claude Code in the workspace
+- **repos.yaml** - Full package registry with dependencies
+- **`.core/docs/core-folder-spec.md`** - Specification for `.core/` folders
+
+Each package in `packages/` has its own CLAUDE.md with package-specific guidance.

@@ -1,0 +1,55 @@
+{
+  "$schema": "https://claude.ai/code/plugin-schema.json",
+  "name": "host-uk-workspace",
+  "version": "1.0.0",
+  "description": "Claude Code integration for Host UK developer workspace",
+
+  "skills": [
+    {
+      "name": "workspace",
+      "file": "skills/workspace.md",
+      "description": "Navigate and manage the Host UK multi-repo workspace"
+    },
+    {
+      "name": "switch-package",
+      "file": "skills/switch-package.md",
+      "description": "Switch the active package for core CLI commands"
+    },
+    {
+      "name": "package-status",
+      "file": "skills/package-status.md",
+      "description": "Show status of all packages in the workspace"
+    }
+  ],
+
+  "hooks": {
+    "pre_command": [
+      {
+        "pattern": "^(git (add|commit|push|pull)|composer (test|lint))$",
+        "script": "hooks/prefer-core.sh",
+        "description": "Suggest core CLI equivalents for common commands"
+      }
+    ]
+  },
+
+  "commands": {
+    "status": {
+      "description": "Show workspace and package status",
+      "run": "core health"
+    },
+    "test": {
+      "description": "Run tests in active package",
+      "run": "core php test"
+    },
+    "lint": {
+      "description": "Run linter in active package",
+      "run": "core php lint"
+    }
+  },
+
+  "context": {
+    "workspace_root": true,
+    "registry_file": "repos.yaml",
+    "packages_dir": "packages"
+  }
+}

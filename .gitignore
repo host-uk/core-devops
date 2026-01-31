@@ -2,8 +2,8 @@
 packages/*
 !packages/.gitkeep
 
-# Core CLI cache (transient data)
-.core/
+# Core CLI cache (transient data, not config)
+.core/cache/
 
 # IDE
 .idea/
