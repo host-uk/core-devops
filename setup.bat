@@ -41,10 +41,16 @@ if !errorlevel! neq 0 (
     goto :error
 )
 
-REM Validate paths don't contain suspicious characters
-echo !LOCALAPPDATA! | findstr /r "[<>|&^]" >nul
+REM Validate paths don't contain suspicious characters that could enable injection
+REM Blocks: < > | & ^ ` %% (shell metacharacters)
+echo !LOCALAPPDATA! | findstr /r "[<>|&^`]" >nul
 if !errorlevel! equ 0 (
-    echo ERROR: LOCALAPPDATA contains invalid characters
+    echo ERROR: LOCALAPPDATA contains invalid shell characters
+    goto :error
+)
+echo !LOCALAPPDATA! | findstr /c:"%%" >nul
+if !errorlevel! equ 0 (
+    echo ERROR: LOCALAPPDATA contains percent signs
     goto :error
 )
 
@@ -68,7 +74,15 @@ if not exist "!CORE_PATH!\core.exe" (
     goto :error
 )
 
-REM Check if it's a symlink/junction (basic check via attributes)
+REM Check if it's a symlink/junction using fsutil (more reliable than attributes)
+fsutil reparsepoint query "!CORE_PATH!" >nul 2>&1
+if !errorlevel! equ 0 (
+    echo ERROR: Install directory is a reparse point (symlink or junction^)
+    echo This may indicate a symlink attack. Aborting.
+    goto :error
+)
+
+REM Fallback: also check attributes for symlink indicator
 for %%F in ("!CORE_PATH!") do (
     set "ATTRS=%%~aF"
 )
