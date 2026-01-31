@@ -1,0 +1,23 @@
+name: Dockerfile Lint
+
+on:
+  push:
+    branches: [dev, main]
+    paths: ['**/Dockerfile*', '**.dockerfile']
+  pull_request:
+    branches: [dev, main]
+    paths: ['**/Dockerfile*', '**.dockerfile']
+  workflow_dispatch:
+
+jobs:
+  hadolint:
+    name: Hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          recursive: true
+          failure-threshold: warning
