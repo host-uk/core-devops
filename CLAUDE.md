@@ -136,8 +136,8 @@ Defined in `repos.yaml`:
 ## Troubleshooting
 
 - **"core: command not found"** → `make install-core` (builds from https://github.com/host-uk/core)
-- **"gh: command not found"** → `brew install gh && gh auth login -h github.com -p https -s workflow,repo,read:org`
-- **"refusing to allow an OAuth App to create or update workflow"** → `gh auth refresh -h github.com -s workflow`
+- **"gh: command not found"** → `brew install gh && gh auth login -h github.com -p https -s workflow,repo,read:org,read:project,project`
+- **"refusing to allow..." or "missing required scopes"** → `gh auth refresh -h github.com -s workflow,read:project,project`
 - **Clone failures** → `ssh -T git@github.com` to verify SSH keys
 
 ## This Repo's Scope

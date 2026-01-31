@@ -103,6 +103,28 @@ function Main {
 
     Write-Info "Dependencies installed!"
     Write-Host ""
+
+    # Configure GitHub CLI if not already authenticated
+    if (Test-Command gh) {
+        $authStatus = gh auth status 2>&1 | Out-String
+        if ($authStatus -match "not logged in") {
+            Write-Info "Configuring GitHub CLI..."
+            Write-Host "You'll need to authenticate with GitHub."
+            gh auth login -h github.com -p https -s workflow,repo,read:org,read:project,project
+        } else {
+            # Check for missing scopes
+            $missingScopes = @()
+            if ($authStatus -notmatch "workflow") { $missingScopes += "workflow" }
+            if ($authStatus -notmatch "read:project") { $missingScopes += "read:project,project" }
+
+            if ($missingScopes.Count -gt 0) {
+                Write-Warn "GitHub CLI missing scopes: $($missingScopes -join ', ')"
+                Write-Host "Run: gh auth refresh -h github.com -s workflow,read:project,project"
+            }
+        }
+    }
+
+    Write-Host ""
     Write-Host "Next: Run '.\scripts\install-core.ps1' to install the core CLI"
 }
 

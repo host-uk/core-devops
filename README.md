@@ -136,12 +136,12 @@ make install-core
 
 **"gh: command not found"**
 ```bash
-brew install gh && gh auth login -h github.com -p https -s workflow,repo,read:org
+brew install gh && gh auth login -h github.com -p https -s workflow,repo,read:org,read:project,project
 ```
 
-**"refusing to allow an OAuth App to create or update workflow"**
+**"refusing to allow an OAuth App to create or update workflow"** or **"missing required scopes"**
 ```bash
-gh auth refresh -h github.com -s workflow
+gh auth refresh -h github.com -s workflow,read:project,project
 ```
 
 **Clone failures**

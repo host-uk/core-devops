@@ -295,12 +295,22 @@ main() {
             echo "You'll need to authenticate with GitHub."
             echo "When prompted, select HTTPS and add the 'workflow' scope."
             echo ""
-            gh auth login -h github.com -p https -s workflow,repo,read:org
+            gh auth login -h github.com -p https -s workflow,repo,read:org,read:project,project
         else
-            # Check if workflow scope is present
-            if ! gh auth status 2>&1 | grep -q workflow; then
-                warn "GitHub CLI missing 'workflow' scope (needed for pushing repos with GitHub Actions)"
-                echo "Run: gh auth refresh -h github.com -s workflow"
+            # Check if required scopes are present
+            local auth_status=$(gh auth status 2>&1)
+            local missing_scopes=""
+
+            if ! echo "$auth_status" | grep -q workflow; then
+                missing_scopes="workflow"
+            fi
+            if ! echo "$auth_status" | grep -q "read:project"; then
+                missing_scopes="$missing_scopes read:project project"
+            fi
+
+            if [[ -n "$missing_scopes" ]]; then
+                warn "GitHub CLI missing scopes:$missing_scopes"
+                echo "Run: gh auth refresh -h github.com -s workflow,read:project,project"
             fi
         fi
     fi
