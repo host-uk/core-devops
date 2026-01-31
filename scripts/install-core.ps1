@@ -1,5 +1,17 @@
 # Install the Core CLI (Windows)
 # Run: .\scripts\install-core.ps1
+#
+# SECURITY CONTROLS:
+# - Version pinning prevents supply chain attacks via tag manipulation
+# - SHA256 hash verification ensures binary integrity
+# - Path validation prevents LOCALAPPDATA redirection attacks
+# - Symlink detection prevents directory traversal attacks
+# - Restrictive ACLs on temp directories prevent local privilege escalation
+# - GPG signature verification (when available) ensures code authenticity
+#
+# KNOWN LIMITATIONS:
+# - Checksums are fetched from same origin as binaries (consider separate trust root)
+# - No TLS certificate pinning (relies on system CA store)
 
 $ErrorActionPreference = "Stop"
 
@@ -49,6 +61,24 @@ function Get-SecureInstallDir {
 
 $InstallDir = Get-SecureInstallDir
 
+# Verify directory is safe for writing (not a symlink, correct permissions)
+function Test-SecureDirectory {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return $true  # Directory doesn't exist yet, will be created
+    }
+
+    $dirInfo = Get-Item $Path -Force
+
+    # Check for symlinks/junctions
+    if ($dirInfo.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        Write-Err "Directory '$Path' is a symbolic link or junction. Possible symlink attack detected."
+    }
+
+    return $true
+}
+
 # Verify SHA256 hash of downloaded file
 function Test-FileHash {
     param(
@@ -61,7 +91,78 @@ function Test-FileHash {
         Remove-Item -Path $FilePath -Force -ErrorAction SilentlyContinue
         Write-Err "Hash verification failed! Expected: $ExpectedHash, Got: $actualHash. The downloaded file may be corrupted or tampered with."
     }
-    Write-Info "Hash verification passed"
+    Write-Info "Hash verification passed (SHA256: $($actualHash.Substring(0,16))...)"
+}
+
+# Create directory with atomic check-and-create to minimize TOCTOU window
+function New-SecureDirectory {
+    param([string]$Path)
+
+    # Check parent directory for symlinks first
+    $parent = Split-Path $Path -Parent
+    if ($parent -and (Test-Path $parent)) {
+        Test-SecureDirectory -Path $parent
+    }
+
+    # Create directory
+    if (-not (Test-Path $Path)) {
+        New-Item -ItemType Directory -Force -Path $Path | Out-Null
+    }
+
+    # Immediately verify it's not a symlink (minimize TOCTOU window)
+    Test-SecureDirectory -Path $Path
+
+    return $Path
+}
+
+# Set restrictive ACL on directory (owner-only access)
+# This is REQUIRED for temp directories - failure is fatal
+function Set-SecureDirectoryAcl {
+    param(
+        [string]$Path,
+        [switch]$Required
+    )
+
+    $maxRetries = 3
+    $retryCount = 0
+
+    while ($retryCount -lt $maxRetries) {
+        try {
+            $acl = Get-Acl $Path
+
+            # Disable inheritance and remove inherited rules
+            $acl.SetAccessRuleProtection($true, $false)
+
+            # Clear existing rules
+            $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) } | Out-Null
+
+            # Add full control for current user only
+            $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+            $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+                $currentUser,
+                [System.Security.AccessControl.FileSystemRights]::FullControl,
+                [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit,
+                [System.Security.AccessControl.PropagationFlags]::None,
+                [System.Security.AccessControl.AccessControlType]::Allow
+            )
+            $acl.AddAccessRule($rule)
+
+            Set-Acl -Path $Path -AclObject $acl
+            Write-Info "Set restrictive permissions on $Path"
+            return $true
+        } catch {
+            $retryCount++
+            if ($retryCount -ge $maxRetries) {
+                if ($Required) {
+                    Write-Err "SECURITY: Failed to set restrictive ACL on '$Path' after $maxRetries attempts: $($_.Exception.Message)"
+                } else {
+                    Write-Warn "Could not set restrictive ACL on '$Path': $($_.Exception.Message)"
+                    return $false
+                }
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
 }
 
 # Download pre-built binary with integrity verification
@@ -74,17 +175,13 @@ function Download-Binary {
     Write-Info "URL: $binaryUrl"
 
     try {
-        New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+        # Create and verify install directory
+        New-SecureDirectory -Path $InstallDir
 
-        # Verify install directory is actually a directory (not a symlink to elsewhere)
-        $dirInfo = Get-Item $InstallDir
-        if ($dirInfo.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            Write-Err "Install directory is a symbolic link. Possible symlink attack detected."
-        }
+        # Use a temp file in the same directory (same filesystem for atomic move)
+        $tempExe = Join-Path $InstallDir "core.exe.tmp.$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
 
-        $tempExe = Join-Path $InstallDir "core.exe.tmp"
-
-        # Download the binary
+        # Download the binary to temp location
         Invoke-WebRequest -Uri $binaryUrl -OutFile $tempExe -UseBasicParsing
 
         # Download and parse checksums
@@ -106,13 +203,17 @@ function Download-Binary {
             Write-Err "Could not find checksum for core-windows-$arch.exe in checksums.txt"
         }
 
-        # Verify hash
+        # Verify hash BEFORE any move operation
         Test-FileHash -FilePath $tempExe -ExpectedHash $expectedHash
 
-        # Move to final location only after verification
-        Move-Item -Path $tempExe -Destination (Join-Path $InstallDir "core.exe") -Force
+        # Re-verify directory hasn't been replaced with symlink (reduce TOCTOU window)
+        Test-SecureDirectory -Path $InstallDir
 
-        Write-Info "Downloaded and verified: $InstallDir\core.exe"
+        # Atomic move to final location (same filesystem)
+        $finalPath = Join-Path $InstallDir "core.exe"
+        Move-Item -Path $tempExe -Destination $finalPath -Force
+
+        Write-Info "Downloaded and verified: $finalPath"
         return $true
     } catch [System.Net.WebException] {
         Write-Warn "Network error during download: $($_.Exception.Message)"
@@ -129,38 +230,41 @@ function Download-Binary {
     }
 }
 
-# Set restrictive ACL on directory (owner-only access)
-function Set-SecureDirectoryAcl {
-    param([string]$Path)
+# Verify GPG signature on git tag (if gpg is available)
+function Test-GitTagSignature {
+    param(
+        [string]$RepoPath,
+        [string]$Tag
+    )
 
+    if (-not (Test-Command gpg)) {
+        Write-Warn "GPG not available - skipping tag signature verification"
+        Write-Warn "For enhanced security, install GPG and import the project signing key"
+        return $true  # Continue without verification
+    }
+
+    Push-Location $RepoPath
     try {
-        $acl = Get-Acl $Path
-
-        # Disable inheritance and remove inherited rules
-        $acl.SetAccessRuleProtection($true, $false)
-
-        # Clear existing rules
-        $acl.Access | ForEach-Object { $acl.RemoveAccessRule($_) } | Out-Null
-
-        # Add full control for current user only
-        $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-            $currentUser,
-            [System.Security.AccessControl.FileSystemRights]::FullControl,
-            [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit,
-            [System.Security.AccessControl.PropagationFlags]::None,
-            [System.Security.AccessControl.AccessControlType]::Allow
-        )
-        $acl.AddAccessRule($rule)
-
-        Set-Acl -Path $Path -AclObject $acl
-        Write-Info "Set restrictive permissions on $Path"
-    } catch {
-        Write-Warn "Could not set restrictive ACL: $($_.Exception.Message)"
+        # Attempt to verify the tag signature
+        $result = git tag -v $Tag 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Info "GPG signature verified for tag $Tag"
+            return $true
+        } else {
+            # Check if tag is unsigned vs signature invalid
+            if ($result -match "error: no signature found") {
+                Write-Warn "Tag $Tag is not signed - continuing without signature verification"
+                return $true
+            } else {
+                Write-Err "GPG signature verification FAILED for tag $Tag. Possible tampering detected."
+            }
+        }
+    } finally {
+        Pop-Location
     }
 }
 
-# Build from source
+# Build from source with security checks
 function Build-FromSource {
     if (-not (Test-Command git)) {
         Write-Err "Git is required to build from source. Run '.\scripts\install-deps.ps1' first"
@@ -169,11 +273,12 @@ function Build-FromSource {
         Write-Err "Go is required to build from source. Run '.\scripts\install-deps.ps1' first"
     }
 
-    $tmpdir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
-    New-Item -ItemType Directory -Force -Path $tmpdir | Out-Null
+    # Create secure temp directory with restrictive ACL
+    $tmpdir = Join-Path ([System.IO.Path]::GetTempPath()) "core-build-$([System.Guid]::NewGuid().ToString('N'))"
+    New-SecureDirectory -Path $tmpdir
 
-    # Set restrictive ACL on temp directory
-    Set-SecureDirectoryAcl -Path $tmpdir
+    # ACL is REQUIRED for temp build directories (security critical)
+    Set-SecureDirectoryAcl -Path $tmpdir -Required
 
     try {
         Write-Info "Cloning $Repo (version $Version)..."
@@ -184,6 +289,9 @@ function Build-FromSource {
         if ($LASTEXITCODE -ne 0) {
             Write-Err "Failed to clone repository at version $Version"
         }
+
+        # Verify GPG signature on tag (if available)
+        Test-GitTagSignature -RepoPath $cloneDir -Tag $Version
 
         Write-Info "Building core CLI..."
         Push-Location $cloneDir
@@ -196,14 +304,10 @@ function Build-FromSource {
             Pop-Location
         }
 
-        New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+        # Create and verify install directory
+        New-SecureDirectory -Path $InstallDir
 
-        # Verify install directory is not a symlink
-        $dirInfo = Get-Item $InstallDir
-        if ($dirInfo.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-            Write-Err "Install directory is a symbolic link. Possible symlink attack detected."
-        }
-
+        # Move built binary to install location
         Move-Item (Join-Path $cloneDir "core.exe") (Join-Path $InstallDir "core.exe") -Force
 
         Write-Info "Built and installed to $InstallDir\core.exe"
@@ -214,7 +318,7 @@ function Build-FromSource {
     }
 }
 
-# Validate and add to PATH
+# Validate and add to PATH with precise matching
 function Setup-Path {
     $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 
@@ -233,7 +337,15 @@ function Setup-Path {
         return
     }
 
-    if ($userPath -notlike "*$InstallDir*") {
+    # Use precise PATH entry matching (not substring)
+    $pathEntries = $userPath -split ';' | ForEach-Object { $_.TrimEnd('\') }
+    $normalizedInstallDir = $resolvedInstallDir.TrimEnd('\')
+
+    $alreadyInPath = $pathEntries | Where-Object {
+        $_.Equals($normalizedInstallDir, [System.StringComparison]::OrdinalIgnoreCase)
+    }
+
+    if (-not $alreadyInPath) {
         Write-Info "Adding $InstallDir to PATH..."
         [Environment]::SetEnvironmentVariable("PATH", "$userPath;$InstallDir", "User")
         $env:PATH = "$env:PATH;$InstallDir"
