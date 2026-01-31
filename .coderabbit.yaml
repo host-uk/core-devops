@@ -1,0 +1,13 @@
+# CodeRabbit Configuration
+# Inherits from: https://github.com/host-uk/coderabbit/.coderabbit.yaml
+
+reviews:
+  review_status: false
+  
+  path_instructions:
+    - path: "scripts/**"
+      instructions: "Setup scripts - ensure cross-platform compatibility (macOS, Linux, Windows)"
+    - path: "doc/**"
+      instructions: "Documentation - check for accuracy and British English spelling"
+    - path: ".github/**"
+      instructions: "GitHub config - validate workflow syntax and action versions"
