@@ -1,6 +1,11 @@
 # Install the Core CLI (Windows)
 # Run: .\scripts\install-core.ps1
 #
+# REQUIREMENTS:
+# - PowerShell 4.0 or later
+# - Windows 10/11 or Windows Server 2016+
+# - 100MB free disk space
+#
 # SECURITY CONTROLS:
 # - Version pinning prevents supply chain attacks via tag manipulation
 # - SHA256 hash verification ensures binary integrity
@@ -15,8 +20,15 @@
 
 $ErrorActionPreference = "Stop"
 
+# Check PowerShell version (4.0+ required for Get-FileHash and other features)
+if ($PSVersionTable.PSVersion.Major -lt 4) {
+    Write-Host "[ERROR] PowerShell 4.0 or later is required. Current version: $($PSVersionTable.PSVersion)" -ForegroundColor Red
+    exit 1
+}
+
 $Repo = "host-uk/core"
 $Version = "v0.1.0"  # Pinned version - update when releasing new versions
+$MinDiskSpaceMB = 100  # Minimum required disk space in MB
 
 function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Green }
 function Write-Warn { Write-Host "[WARN] $args" -ForegroundColor Yellow }
@@ -24,6 +36,32 @@ function Write-Err { Write-Host "[ERROR] $args" -ForegroundColor Red; exit 1 }
 
 function Test-Command($cmd) {
     return [bool](Get-Command $cmd -ErrorAction SilentlyContinue)
+}
+
+# Check available disk space
+function Test-DiskSpace {
+    param([string]$Path)
+
+    try {
+        # Get the drive from the path
+        $drive = [System.IO.Path]::GetPathRoot($Path)
+        if ([string]::IsNullOrEmpty($drive)) {
+            $drive = [System.IO.Path]::GetPathRoot($env:LOCALAPPDATA)
+        }
+
+        $driveInfo = Get-PSDrive -Name $drive.Substring(0, 1) -ErrorAction Stop
+        $freeSpaceMB = [math]::Round($driveInfo.Free / 1MB, 2)
+
+        if ($freeSpaceMB -lt $MinDiskSpaceMB) {
+            Write-Err "Insufficient disk space. Need at least ${MinDiskSpaceMB}MB, but only ${freeSpaceMB}MB available on drive $drive"
+        }
+
+        Write-Info "Disk space check passed (${freeSpaceMB}MB available)"
+        return $true
+    } catch {
+        Write-Warn "Could not verify disk space: $($_.Exception.Message)"
+        return $true  # Continue anyway if check fails
+    }
 }
 
 # Validate and get secure install directory
@@ -179,6 +217,9 @@ function Download-Binary {
     Write-Info "Attempting to download pre-built binary (version $Version)..."
     Write-Info "URL: $binaryUrl"
 
+    # Track temp file for cleanup
+    $tempExe = $null
+
     try {
         # Create and verify install directory
         New-SecureDirectory -Path $InstallDir
@@ -204,7 +245,6 @@ function Download-Binary {
         }
 
         if ([string]::IsNullOrEmpty($expectedHash)) {
-            Remove-Item -Path $tempExe -Force -ErrorAction SilentlyContinue
             Write-Err "Could not find checksum for core-windows-$arch.exe in checksums.txt"
         }
 
@@ -217,6 +257,7 @@ function Download-Binary {
         # Atomic move to final location (same filesystem)
         $finalPath = Join-Path $InstallDir "core.exe"
         Move-Item -Path $tempExe -Destination $finalPath -Force
+        $tempExe = $null  # Clear so finally block doesn't try to delete
 
         Write-Info "Downloaded and verified: $finalPath"
         return $true
@@ -232,6 +273,11 @@ function Download-Binary {
         Write-Warn "Download failed: $($_.Exception.Message)"
         Write-Warn "Will attempt to build from source"
         return $false
+    } finally {
+        # Clean up temp file if it exists (handles Ctrl+C and other interruptions)
+        if ($tempExe -and (Test-Path $tempExe -ErrorAction SilentlyContinue)) {
+            Remove-Item -Path $tempExe -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
@@ -352,7 +398,9 @@ function Setup-Path {
 
     if (-not $alreadyInPath) {
         Write-Info "Adding $InstallDir to PATH..."
-        [Environment]::SetEnvironmentVariable("PATH", "$userPath;$InstallDir", "User")
+        # Trim trailing semicolons to prevent duplicates
+        $cleanPath = $userPath.TrimEnd(';')
+        [Environment]::SetEnvironmentVariable("PATH", "$cleanPath;$InstallDir", "User")
         $env:PATH = "$env:PATH;$InstallDir"
     }
 }
@@ -377,6 +425,9 @@ function Verify {
 # Main
 function Main {
     Write-Info "Installing Core CLI (version $Version)..."
+
+    # Check disk space before starting
+    Test-DiskSpace -Path $InstallDir
 
     # Try download first, fallback to build
     if (-not (Download-Binary)) {
