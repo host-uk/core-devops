@@ -1,0 +1,163 @@
+name: Free Tier Security Scanners
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly Monday 6am
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # Semgrep - FREE, powerful SAST
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Semgrep Scan
+        run: |
+          semgrep scan --config auto --sarif --output semgrep.sarif || true
+          
+      - name: Upload SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+        if: always()
+        continue-on-error: true
+
+  # Trivy - FREE container/IaC scanner
+  trivy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy.sarif'
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+          
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy.sarif
+        if: always()
+        continue-on-error: true
+
+  # Gitleaks - FREE secret scanner
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # OSV-Scanner - FREE vulnerability DB from Google
+  osv-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: OSV Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --recursive
+            --format=sarif
+            --output=osv.sarif
+            .
+        continue-on-error: true
+            
+      - name: Upload OSV SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: osv.sarif
+        if: always()
+        continue-on-error: true
+
+  # Checkov - FREE IaC scanner
+  checkov:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Checkov Scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: all
+          output_format: sarif
+          output_file_path: checkov.sarif
+        continue-on-error: true
+          
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+        if: always()
+        continue-on-error: true
+
+  # Aggregate all findings for core CLI to consume
+  aggregate-findings:
+    needs: [semgrep, trivy, gitleaks, osv-scanner, checkov]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "## 🔍 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scanner | Status | Free Tier |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Semgrep | ${{ needs.semgrep.result }} | Unlimited |" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy | ${{ needs.trivy.result }} | Unlimited |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitleaks | ${{ needs.gitleaks.result }} | Unlimited |" >> $GITHUB_STEP_SUMMARY
+          echo "| OSV-Scanner | ${{ needs.osv-scanner.result }} | Unlimited |" >> $GITHUB_STEP_SUMMARY
+          echo "| Checkov | ${{ needs.checkov.result }} | Unlimited |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Results uploaded to GitHub Security tab." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "_All scanners are 100% free. No API keys needed._" >> $GITHUB_STEP_SUMMARY
+
+      - name: Create findings artifact for core CLI
+        run: |
+          # Create JSON summary for core CLI to consume
+          cat > findings.json << 'FINDINGS'
+          {
+            "timestamp": "${{ github.event.head_commit.timestamp }}",
+            "commit": "${{ github.sha }}",
+            "scanners": {
+              "semgrep": "${{ needs.semgrep.result }}",
+              "trivy": "${{ needs.trivy.result }}",
+              "gitleaks": "${{ needs.gitleaks.result }}",
+              "osv": "${{ needs.osv-scanner.result }}",
+              "checkov": "${{ needs.checkov.result }}"
+            },
+            "security_tab": "https://github.com/${{ github.repository }}/security/code-scanning"
+          }
+          FINDINGS
+          cat findings.json
+          
+      - uses: actions/upload-artifact@v4
+        with:
+          name: security-findings
+          path: findings.json
+          retention-days: 30
