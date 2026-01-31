@@ -39,11 +39,15 @@ REM Run doctor
 echo.
 echo === Verifying environment ===
 call "%LOCALAPPDATA%\Programs\core\core.exe" doctor
+if !errorlevel! neq 0 (
+    echo WARNING: core doctor reported issues
+)
 
 REM Clone repos
 echo.
 echo === Cloning repositories ===
 call "%LOCALAPPDATA%\Programs\core\core.exe" setup
+if !errorlevel! neq 0 goto :error
 
 echo.
 echo === Setup complete! ===

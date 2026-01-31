@@ -35,6 +35,9 @@ function Download-Binary {
 
 # Build from source
 function Build-FromSource {
+    if (-not (Test-Command git)) {
+        Write-Err "Git is required to build from source. Run '.\scripts\install-deps.ps1' first"
+    }
     if (-not (Test-Command go)) {
         Write-Err "Go is required to build from source. Run '.\scripts\install-deps.ps1' first"
     }
@@ -42,20 +45,32 @@ function Build-FromSource {
     $tmpdir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
     New-Item -ItemType Directory -Force -Path $tmpdir | Out-Null
 
-    Write-Info "Cloning $Repo..."
-    $cloneDir = Join-Path $tmpdir "Core"
-    git clone --depth 1 "https://github.com/$Repo.git" $cloneDir
+    try {
+        Write-Info "Cloning $Repo..."
+        $cloneDir = Join-Path $tmpdir "Core"
+        git clone --depth 1 "https://github.com/$Repo.git" $cloneDir
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Failed to clone repository"
+        }
 
-    Write-Info "Building core CLI..."
-    Push-Location $cloneDir
-    go build -o core.exe .
-    Pop-Location
+        Write-Info "Building core CLI..."
+        Push-Location $cloneDir
+        go build -o core.exe .
+        if ($LASTEXITCODE -ne 0) {
+            Pop-Location
+            Write-Err "Go build failed"
+        }
+        Pop-Location
 
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Move-Item (Join-Path $cloneDir "core.exe") (Join-Path $InstallDir "core.exe") -Force
+        New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+        Move-Item (Join-Path $cloneDir "core.exe") (Join-Path $InstallDir "core.exe") -Force
 
-    Remove-Item -Recurse -Force $tmpdir
-    Write-Info "Built and installed to $InstallDir\core.exe"
+        Write-Info "Built and installed to $InstallDir\core.exe"
+    } finally {
+        if (Test-Path $tmpdir) {
+            Remove-Item -Recurse -Force $tmpdir -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 # Add to PATH
