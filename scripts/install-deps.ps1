@@ -40,6 +40,9 @@ function Install-Chocolatey {
 
         Write-Info "Executing Chocolatey installer..."
         & $tempScript
+        if ($LASTEXITCODE -ne 0) {
+            Write-Err "Chocolatey installation failed with exit code $LASTEXITCODE"
+        }
     } finally {
         # Clean up temp file
         if (Test-Path $tempScript) {

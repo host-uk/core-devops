@@ -88,7 +88,10 @@ install_brew() {
         error "Failed to download Homebrew installer"
     }
 
-    /bin/bash "$temp_script"
+    /bin/bash "$temp_script" || {
+        rm -f "$temp_script"
+        error "Homebrew installation failed"
+    }
     rm -f "$temp_script"
 
     # Add to PATH for this session
@@ -232,7 +235,10 @@ setup_linux_apt() {
             error "Failed to download NodeSource setup script"
         }
 
-        sudo -E bash "$temp_script"
+        sudo -E bash "$temp_script" || {
+            rm -f "$temp_script"
+            error "NodeSource setup failed"
+        }
         rm -f "$temp_script"
         sudo apt-get install -y nodejs
     fi

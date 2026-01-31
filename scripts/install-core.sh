@@ -99,11 +99,12 @@ check_not_symlink() {
 
 # Try to download pre-built binary with integrity verification
 download_binary() {
-    local os=$(detect_os)
-    local arch=$(detect_arch)
-    local binary_name="core-${os}-${arch}"
-    local binary_url="https://github.com/$REPO/releases/download/$VERSION/${binary_name}"
-    local checksum_url="https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
+    local os arch binary_name binary_url checksum_url
+    os=$(detect_os)
+    arch=$(detect_arch)
+    binary_name="core-${os}-${arch}"
+    binary_url="https://github.com/$REPO/releases/download/$VERSION/${binary_name}"
+    checksum_url="https://github.com/$REPO/releases/download/$VERSION/checksums.txt"
 
     if [[ "$os" == "windows" ]]; then
         binary_name="${binary_name}.exe"
