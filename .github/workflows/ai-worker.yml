@@ -1,0 +1,126 @@
+name: AI Worker (Free Tier)
+
+# Runs on contributor's fork - uses THEIR API allowances
+# Gemini 2.0 Flash: 1500 req/day free
+# Jules: Available to all GitHub users
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+env:
+  # Contributors set their own GEMINI_API_KEY in fork secrets
+  # Free tier: 1500 requests/day, 1M tokens/min
+  GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+jobs:
+  # Analyze PR with Gemini (contributor's free tier)
+  gemini-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get diff
+        id: diff
+        run: |
+          DIFF=$(git diff origin/${{ github.base_ref }}...HEAD | head -c 50000)
+          echo "diff<<EOFMARKER" >> $GITHUB_OUTPUT
+          echo "$DIFF" >> $GITHUB_OUTPUT
+          echo "EOFMARKER" >> $GITHUB_OUTPUT
+
+      - name: Gemini Analysis
+        if: env.GEMINI_API_KEY != ''
+        id: gemini
+        run: |
+          # Call Gemini 2.0 Flash (free tier)
+          RESPONSE=$(curl -s "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=$GEMINI_API_KEY" \
+            -H 'Content-Type: application/json' \
+            -d @- << 'PAYLOAD'
+          {
+            "contents": [{
+              "parts": [{
+                "text": "Review this code diff. Be concise. List: 1) Security issues 2) Bugs 3) Improvements. If none, say 'LGTM'.\n\nDiff:\n${{ steps.diff.outputs.diff }}"
+              }]
+            }],
+            "generationConfig": {
+              "temperature": 0.2,
+              "maxOutputTokens": 1000
+            }
+          }
+          PAYLOAD
+          )
+          
+          # Extract text from response
+          REVIEW=$(echo "$RESPONSE" | jq -r '.candidates[0].content.parts[0].text // "Analysis failed"')
+          echo "review<<EOFMARKER" >> $GITHUB_OUTPUT
+          echo "$REVIEW" >> $GITHUB_OUTPUT
+          echo "EOFMARKER" >> $GITHUB_OUTPUT
+
+      - name: Post Gemini review
+        if: steps.gemini.outputs.review != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const review = `${{ steps.gemini.outputs.review }}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🤖 Gemini Analysis (Free Tier)\n\n${review}\n\n---\n_Powered by contributor's Gemini API allowance (1500 req/day free)_`
+            });
+
+  # Trigger Jules to fix issues (contributor's Copilot allowance)
+  trigger-jules:
+    if: github.event_name == 'issues' && github.event.label.name == 'agent:ready'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Jules eligibility
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Check if this repo has Copilot coding agent enabled
+            const issue = context.payload.issue;
+            
+            console.log(`Issue #${issue.number}: ${issue.title}`);
+            console.log(`Labels: ${issue.labels.map(l => l.name).join(', ')}`);
+            
+            // Jules can be assigned to issues with specific labels
+            const hasAgentic = issue.labels.some(l => l.name === 'agentic');
+            
+            return { eligible: hasAgentic, issueNumber: issue.number };
+
+      - name: Assign to Jules
+        if: steps.check.outputs.result != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Trigger Jules by adding the copilot label
+            // Jules will pick up the issue and create a PR
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: ['copilot']  // This triggers Jules/Copilot coding agent
+              });
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: `## 🤖 Jules Activated\n\nThis issue has been assigned to GitHub Copilot coding agent (Jules).\n\nJules will:\n1. Analyze the issue\n2. Create a solution\n3. Open a PR with the fix\n\n_Using contributor's Copilot allowance_ 🆓`
+              });
+            } catch (e) {
+              console.log('Could not assign to Jules:', e.message);
+            }

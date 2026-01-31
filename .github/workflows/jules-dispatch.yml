@@ -1,0 +1,64 @@
+name: Jules Task Dispatch
+
+# Dispatch tasks to Jules (Copilot coding agent)
+# Jules works on the contributor's fork using their Copilot Pro allowance
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  dispatch-to-jules:
+    # Trigger when someone comments "@jules" or "/jules"
+    if: contains(github.event.comment.body, '@jules') || contains(github.event.comment.body, '/jules')
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Parse Jules command
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = context.payload.comment.body;
+            
+            // Extract task from comment
+            // Format: @jules <task description>
+            // or: /jules fix the bug in auth.php
+            const match = comment.match(/(?:@jules|\/jules)\s+(.+)/i);
+            const task = match ? match[1].trim() : null;
+            
+            return { task, commenter: context.payload.comment.user.login };
+
+      - name: Create Jules task
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = ${{ steps.parse.outputs.result }};
+            
+            if (!result.task) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: `@${result.commenter} Please specify a task for Jules:\n\n\`@jules fix the authentication bug\`\n\`@jules add unit tests for User model\`\n\`@jules refactor this to use async/await\``
+              });
+              return;
+            }
+            
+            // Add copilot label to trigger Jules
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['copilot', 'agent:wip']
+            });
+            
+            // Create a sub-issue or task for Jules
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🤖 Jules Task Queued\n\n**Task:** ${result.task}\n**Requested by:** @${result.commenter}\n\nJules (Copilot coding agent) will work on this using the repository owner's Copilot allowance.\n\n---\n_Tip: Fork this repo to use your own Copilot Pro allowance for faster processing._`
+            });
