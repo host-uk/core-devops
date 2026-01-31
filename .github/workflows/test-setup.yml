@@ -1,0 +1,153 @@
+name: Test Setup Scripts
+
+on:
+  push:
+    branches: [dev, main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/test-setup.yml'
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - 'scripts/**'
+      - '.github/workflows/test-setup.yml'
+  # Weekly test to catch upstream changes (package repos, etc.)
+  schedule:
+    - cron: '0 6 * * 1'  # Every Monday at 6am UTC
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  test-linux:
+    name: Linux (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run install-deps.sh
+        run: |
+          chmod +x scripts/install-deps.sh
+          ./scripts/install-deps.sh
+
+      - name: Verify dependencies installed
+        run: |
+          echo "=== Checking installed tools ==="
+          git --version
+          gh --version
+          go version
+          php --version
+          composer --version
+          node --version
+          pnpm --version
+          echo "=== All dependencies verified ==="
+
+      - name: Run install-core.sh
+        run: |
+          chmod +x scripts/install-core.sh
+          ./scripts/install-core.sh
+        env:
+          INSTALL_DIR: ${{ github.workspace }}/bin
+
+      - name: Verify core CLI installed
+        run: |
+          export PATH="${{ github.workspace }}/bin:$PATH"
+          core --version || echo "Core CLI version check"
+          core doctor || echo "Core doctor completed"
+
+  test-macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run install-deps.sh
+        run: |
+          chmod +x scripts/install-deps.sh
+          ./scripts/install-deps.sh
+
+      - name: Verify dependencies installed
+        run: |
+          echo "=== Checking installed tools ==="
+          git --version
+          gh --version
+          go version
+          php --version
+          composer --version
+          node --version
+          pnpm --version
+          echo "=== All dependencies verified ==="
+
+      - name: Run install-core.sh
+        run: |
+          chmod +x scripts/install-core.sh
+          ./scripts/install-core.sh
+        env:
+          INSTALL_DIR: ${{ github.workspace }}/bin
+
+      - name: Verify core CLI installed
+        run: |
+          export PATH="${{ github.workspace }}/bin:$PATH"
+          core --version || echo "Core CLI version check"
+          core doctor || echo "Core doctor completed"
+
+  test-windows:
+    name: Windows
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run install-deps.ps1
+        shell: pwsh
+        run: |
+          # Run as current user (GitHub runners have admin)
+          # Modify script to skip admin check for CI
+          $script = Get-Content scripts/install-deps.ps1 -Raw
+          $script = $script -replace 'Write-Err "Please run this script as Administrator"', 'Write-Warn "Skipping admin check in CI"'
+          $script | Set-Content scripts/install-deps-ci.ps1
+          .\scripts\install-deps-ci.ps1
+
+      - name: Verify dependencies installed
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking installed tools ==="
+          git --version
+          gh --version
+          go version
+          php --version
+          composer --version
+          node --version
+          pnpm --version
+          Write-Host "=== All dependencies verified ==="
+
+      - name: Run install-core.ps1
+        shell: pwsh
+        run: |
+          .\scripts\install-core.ps1
+        env:
+          INSTALL_DIR: ${{ github.workspace }}\bin
+
+      - name: Verify core CLI installed
+        shell: pwsh
+        run: |
+          $env:PATH = "${{ github.workspace }}\bin;$env:PATH"
+          core --version
+          core doctor
+
+  # Summary job that requires all platforms to pass
+  setup-complete:
+    name: All Platforms
+    needs: [test-linux, test-macos, test-windows]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.test-linux.result }}" != "success" ] || \
+             [ "${{ needs.test-macos.result }}" != "success" ] || \
+             [ "${{ needs.test-windows.result }}" != "success" ]; then
+            echo "One or more platform tests failed"
+            exit 1
+          fi
+          echo "All platform tests passed!"

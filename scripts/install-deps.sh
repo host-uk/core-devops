@@ -287,6 +287,25 @@ main() {
 
     info "Dependencies installed!"
     echo ""
+
+    # Configure GitHub CLI if not already authenticated
+    if has gh; then
+        if ! gh auth status &>/dev/null; then
+            info "Configuring GitHub CLI..."
+            echo "You'll need to authenticate with GitHub."
+            echo "When prompted, select HTTPS and add the 'workflow' scope."
+            echo ""
+            gh auth login -h github.com -p https -s workflow,repo,read:org
+        else
+            # Check if workflow scope is present
+            if ! gh auth status 2>&1 | grep -q workflow; then
+                warn "GitHub CLI missing 'workflow' scope (needed for pushing repos with GitHub Actions)"
+                echo "Run: gh auth refresh -h github.com -s workflow"
+            fi
+        fi
+    fi
+
+    echo ""
     echo "Next: Run './scripts/install-core.sh' to install the core CLI"
 }
 
