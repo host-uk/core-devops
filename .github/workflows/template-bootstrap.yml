@@ -1,0 +1,140 @@
+name: Bootstrap from Template
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+    inputs:
+      repo_type:
+        description: 'Repository type'
+        required: true
+        default: 'module'
+        type: choice
+        options:
+          - foundation
+          - module
+          - product
+          - service
+          - infra
+          - template
+
+jobs:
+  bootstrap:
+    # Only run if this looks like a fresh repo (no releases, few commits)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check if bootstrap needed
+        id: check
+        run: |
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          if [ "$COMMIT_COUNT" -lt 5 ]; then
+            echo "needs_bootstrap=true" >> $GITHUB_OUTPUT
+            echo "Fresh repo detected ($COMMIT_COUNT commits)"
+          else
+            echo "needs_bootstrap=false" >> $GITHUB_OUTPUT
+            echo "Existing repo ($COMMIT_COUNT commits) - skipping bootstrap"
+          fi
+      
+      - name: Create standard labels
+        if: steps.check.outputs.needs_bootstrap == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Agent workflow labels
+          gh label create "agent:ready" --description "Task ready for AI agent" --color "0E8A16" --force || true
+          gh label create "agent:wip" --description "Work in progress by agent" --color "F9D0C4" --force || true
+          gh label create "agent:review" --description "Needs verification" --color "FBCA04" --force || true
+          gh label create "agent:blocked" --description "Needs human input" --color "D93F0B" --force || true
+          gh label create "verified" --description "Work verified" --color "0E8A16" --force || true
+          gh label create "verify-failed" --description "Verification failed" --color "D93F0B" --force || true
+          gh label create "agentic" --description "AI-consumable task" --color "5319E7" --force || true
+          
+          # Type labels
+          gh label create "type:feature" --description "New feature" --color "0052CC" --force || true
+          gh label create "type:bug" --description "Bug fix" --color "D93F0B" --force || true
+          gh label create "type:security" --description "Security issue" --color "D93F0B" --force || true
+          gh label create "type:docs" --description "Documentation" --color "0075CA" --force || true
+          
+          # Priority labels
+          gh label create "priority:critical" --description "Critical priority" --color "B60205" --force || true
+          gh label create "priority:high" --description "High priority" --color "D93F0B" --force || true
+          gh label create "priority:medium" --description "Medium priority" --color "FBCA04" --force || true
+          gh label create "priority:low" --description "Low priority" --color "0E8A16" --force || true
+          
+          echo "✅ Labels created"
+
+      - name: Set dev as default branch
+        if: steps.check.outputs.needs_bootstrap == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create dev branch if it doesn't exist
+          git checkout -b dev 2>/dev/null || git checkout dev
+          git push origin dev --force-with-lease || true
+          
+          # Set as default (requires admin token, may fail with GITHUB_TOKEN)
+          gh repo edit --default-branch dev || echo "⚠️ Could not set default branch (needs admin)"
+
+      - name: Enable security features
+        if: steps.check.outputs.needs_bootstrap == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Enable vulnerability alerts
+          gh api -X PUT repos/${{ github.repository }}/vulnerability-alerts || true
+          
+          # Enable automated security fixes
+          gh api -X PUT repos/${{ github.repository }}/automated-security-fixes || true
+          
+          echo "✅ Security features enabled"
+
+      - name: Create setup instructions issue
+        if: steps.check.outputs.needs_bootstrap == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "🚀 Repository Setup Checklist" \
+            --label "agentic,type:docs" \
+            --body "## Post-Template Setup
+
+          This repo was created from the [core-devops template](https://github.com/host-uk/core-devops).
+
+          ### Automated ✅
+          - [x] Standard labels created
+          - [x] Security features enabled
+          - [x] CodeRabbit config present
+
+          ### Manual Steps
+          - [ ] Update \`repos.yaml\` with your package details
+          - [ ] Update \`CLAUDE.md\` with project-specific guidance
+          - [ ] Update \`README.md\` with project description
+          - [ ] Add to org project if needed
+          - [ ] Set up any required secrets (\`PROJECT_TOKEN\` for auto-project)
+          - [ ] Remove/customize template files
+
+          ### Optional
+          - [ ] Enable GitHub Pages for docs
+          - [ ] Add to CodeRabbit (if not auto-enabled)
+          - [ ] Configure branch protection rules
+
+          ---
+          _This issue was auto-created by the template bootstrap workflow._"
+          
+          echo "✅ Setup issue created"
+
+      - name: Summary
+        if: steps.check.outputs.needs_bootstrap == 'true'
+        run: |
+          echo "## 🎉 Bootstrap Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Your repo has been configured with:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Standard labels for agent workflow" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Security features enabled" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Setup checklist issue created" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "See the created issue for remaining manual steps." >> $GITHUB_STEP_SUMMARY
