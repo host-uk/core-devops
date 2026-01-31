@@ -1,6 +1,6 @@
 {
   "name": "Core Developer",
-  "image": "ghcr.io/host-uk/core-images/developer:latest",
+  "image": "ghcr.io/host-uk/core-images:developer",
   
   "workspaceMount": "source=${localWorkspaceFolder}/packages,target=/workspace,type=bind",
   "workspaceFolder": "/workspace",

@@ -3,7 +3,7 @@
 
 services:
   dev:
-    image: ghcr.io/host-uk/core-images/developer:latest
+    image: ghcr.io/host-uk/core-images:developer
     container_name: core-dev
     hostname: core-dev
     stdin_open: true
