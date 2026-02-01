@@ -131,6 +131,62 @@ composer test -- --filter=ClassName         # Single test
 ./vendor/bin/pint --dirty                   # Format changed files
 ```
 
+## Local Package Linking
+
+Most packages depend on `host-uk/core` (the published name of `core-php`). Since these are private packages, `composer install` fails unless you configure local path repositories.
+
+### Quick Setup
+
+```bash
+# macOS/Linux - setup all packages
+./scripts/setup-local-packages.sh
+
+# Windows (PowerShell)
+.\scripts\setup-local-packages.ps1
+
+# Or setup a specific package
+./scripts/setup-local-packages.sh core-tenant
+```
+
+### Installing Dependencies
+
+After running the setup script, install dependencies using the local config:
+
+```bash
+# macOS/Linux
+cd packages/core-tenant
+COMPOSER=composer.local.json composer install
+
+# Windows (PowerShell)
+cd packages\core-tenant
+$env:COMPOSER='composer.local.json'; composer install
+```
+
+### How It Works
+
+The setup script generates a `composer.local.json` for each package by merging the original `composer.json` with path repositories pointing to sibling packages:
+
+```json
+{
+    "name": "host-uk/core-tenant",
+    "require": {"host-uk/core": "dev-main"},
+    "repositories": [
+        {"type": "path", "url": "../core-php", "options": {"symlink": true}},
+        {"type": "path", "url": "../core-tenant", "options": {"symlink": true}}
+    ]
+}
+```
+
+When Composer sees `host-uk/core` as a requirement, it resolves it to `../core-php` (symlinked) instead of trying to fetch from Packagist.
+
+### Packages That Need This
+
+Only `core-php` can be tested without local linking (it has no `host-uk/*` dependencies). All other packages require this setup:
+
+- core-tenant, core-admin, core-api, core-mcp, core-agentic
+- core-bio, core-social, core-analytics, core-notify, core-trust, core-support
+- core-commerce, core-content, core-tools, core-uptelligence, core-developer
+
 ## Package Switching Workflow
 
 To work on a different package without navigating:
@@ -176,6 +232,6 @@ Defined in `repos.yaml`:
 
 Don't add application code here. This repo only contains:
 - `repos.yaml` - Package registry with dependencies
-- `scripts/` - Cross-platform setup scripts (install-deps, install-core)
+- `scripts/` - Cross-platform setup scripts (install-deps, install-core, clone-repos, setup-local-packages)
 - `Makefile` - Setup orchestration
 - `.core/` - Workspace configuration and Claude Code integration
