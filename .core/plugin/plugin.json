@@ -24,6 +24,11 @@
       "name": "php-agent",
       "file": "skills/php-agent.md",
       "description": "Autonomous PHP development agent - picks up issues, implements, handles reviews, merges"
+    },
+    {
+      "name": "go-agent",
+      "file": "skills/go-agent.md",
+      "description": "Autonomous Go development agent - picks up issues, implements, handles reviews, merges"
     }
   ],
 
