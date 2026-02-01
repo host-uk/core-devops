@@ -1,6 +1,14 @@
-# TODO - Session Summary 2026-01-31
+# TODO - Session Summary 2026-02-01
 
 ## ✅ Completed Today
+
+### Issue Auto-Labeling
+- [x] Issue templates (bug_report.yml, feature_request.yml) for core + core-devops
+- [x] Auto-label workflow detects: type, project, priority, agentic keywords
+- [x] Complexity dropdown in feature request template
+- [x] Heuristic complexity detection (checklist count, code blocks, sections, file refs, keywords)
+- [x] Retroactively labeled unlabeled issues in core repo
+- [x] Test issue #70 created and auto-labeled correctly
 
 ### GitHub Org Setup
 - [x] Dev branches as default (all repos)
