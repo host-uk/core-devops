@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ProjectDictionaryState">
+  <dictionary name="hostuk">
+    <words>
+      <w>agentic</w>
+      <w>biohost</w>
+      <w>devops</w>
+      <w>fileable</w>
+      <w>hostuk</w>
+      <w>laravel</w>
+      <w>livewire</w>
+      <w>middlewares</w>
+      <w>mcp</w>
+      <w>multitenancy</w>
+      <w>namespacing</w>
+      <w>notifyhost</w>
+      <w>oauth</w>
+      <w>pint</w>
+      <w>phpstan</w>
+      <w>sanctum</w>
+      <w>serializable</w>
+      <w>socialhost</w>
+      <w>tailwindcss</w>
+      <w>tenancy</w>
+      <w>trusthost</w>
+      <w>uptelligence</w>
+      <w>uuid</w>
+      <w>uuids</w>
+      <w>vite</w>
+      <w>webhook</w>
+      <w>webhooks</w>
+    </words>
+  </dictionary>
+</component>

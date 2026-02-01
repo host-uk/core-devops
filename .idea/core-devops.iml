@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="WEB_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$">
+      <sourceFolder url="file://$MODULE_DIR$/packages" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-php/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-tenant/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-admin/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-api/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-mcp/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-agentic/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-bio/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-social/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-analytics/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-notify/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-trust/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-support/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-commerce/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-content/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-tools/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-uptelligence/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-developer/vendor" />
+      <excludeFolder url="file://$MODULE_DIR$/packages/core-template/vendor" />
+      <excludePattern pattern="node_modules" />
+    </content>
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+  </component>
+</module>

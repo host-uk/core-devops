@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Composer Test (core-php)" type="ComposerRunConfigurationType">
+    <option name="command" value="test" />
+    <option name="workingDir" value="$PROJECT_DIR$/packages/core-php" />
+    <method v="2" />
+  </configuration>
+</component>

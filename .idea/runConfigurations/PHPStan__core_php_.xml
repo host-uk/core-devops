@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="PHPStan (core-php)" type="PhpUnitRunConfigurationType" factoryName="PHPUnit">
+    <CommandLine workingDirectory="$PROJECT_DIR$/packages/core-php" />
+    <ExternalSystemSettings>
+      <option name="executionName" />
+      <option name="externalProjectPath" />
+      <option name="externalSystemIdString" value="com.jetbrains.php.phpunit" />
+      <option name="scriptParameters" value="analyse" />
+      <option name="vmOptions" />
+    </ExternalSystemSettings>
+    <EXTENSION ID="PhpQualityToolRunConfigurationExtensionSettingsManager">
+      <QualityTool>
+        <option name="tool" value="PHPStan" />
+      </QualityTool>
+    </EXTENSION>
+    <method v="2" />
+  </configuration>
+</component>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="LaravelSettings">
+    <option name="routeNamespaceModule" value="" />
+    <option name="routeNamespaceWeb" value="" />
+    <option name="viewPath" value="" />
+    <option name="routeNamespaceApi" value="" />
+    <option name="controllerNamespace" value="" />
+    <option name="basePath" value="$PROJECT_DIR$/packages/core-php" />
+    <option name="apiResourceNamespace" value="" />
+    <option name="resourceNamespace" value="" />
+    <option name="multipleModules" value="true" />
+    <option name="livewireEnabled" value="true" />
+    <option name="bladeDirectiveIgnorePrefix" value="" />
+  </component>
+</project>

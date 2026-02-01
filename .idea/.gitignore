@@ -1,0 +1,17 @@
+# User-specific files
+/workspace.xml
+/tasks.xml
+/shelf/
+/httpRequests/
+/dataSources/
+/dataSources.local.xml
+/copilot*.xml
+
+# Sensitive data
+/webServers.xml
+/deployment.xml
+/.env
+
+# OS/editor artifacts
+*.iws
+.DS_Store
