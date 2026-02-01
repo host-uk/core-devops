@@ -27,7 +27,6 @@ if ($PSVersionTable.PSVersion.Major -lt 4) {
 }
 
 $Repo = "host-uk/core"
-$Version = "main"  # Build from main until stable Windows releases are available
 $MinDiskSpaceMB = 100  # Minimum required disk space in MB
 
 function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Green }
@@ -213,10 +212,10 @@ function Set-SecureDirectoryAcl {
 # Download pre-built binary with integrity verification
 function Download-Binary {
     $arch = if ([Environment]::Is64BitOperatingSystem) { "amd64" } else { "386" }
-    $binaryUrl = "https://github.com/$Repo/releases/download/$Version/core-windows-$arch.exe"
-    $checksumUrl = "https://github.com/$Repo/releases/download/$Version/checksums.txt"
+    $binaryUrl = "https://github.com/$Repo/releases/latest/download/core-windows-$arch.exe"
+    $checksumUrl = "https://github.com/$Repo/releases/latest/download/checksums.txt"
 
-    Write-Info "Attempting to download pre-built binary (version $Version)..."
+    Write-Info "Attempting to download pre-built binary..."
     Write-Info "URL: $binaryUrl"
 
     # Track temp file for cleanup
@@ -340,20 +339,13 @@ function Build-FromSource {
     $null = Set-SecureDirectoryAcl -Path $tmpdir -Required
 
     try {
-        Write-Info "Cloning $Repo (version $Version)..."
+        Write-Info "Cloning $Repo..."
         $cloneDir = Join-Path $tmpdir "Core"
 
-        # Clone specific tag for reproducibility
-        git clone --depth 1 --branch $Version "https://github.com/$Repo.git" $cloneDir
+        # Clone default branch
+        git clone --depth 1 "https://github.com/$Repo.git" $cloneDir
         if ($LASTEXITCODE -ne 0) {
-            Write-Err "Failed to clone repository at version $Version"
-        }
-
-        # Verify GPG signature on tag (if available, skip for branches)
-        if ($Version -match "^v\d") {
-            $null = Test-GitTagSignature -RepoPath $cloneDir -Tag $Version
-        } else {
-            Write-Warn "Building from branch '$Version' - GPG verification skipped (only applies to tags)"
+            Write-Err "Failed to clone repository"
         }
 
         Write-Info "Building core CLI..."
@@ -462,7 +454,7 @@ function Verify {
 
 # Main
 function Main {
-    Write-Info "Installing Core CLI (version $Version)..."
+    Write-Info "Installing Core CLI..."
 
     # Check disk space before starting
     $null = Test-DiskSpace -Path $InstallDir
