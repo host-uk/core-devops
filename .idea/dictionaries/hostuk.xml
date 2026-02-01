@@ -1,4 +1,3 @@
-<?xml version="1.0" encoding="UTF-8"?>
 <component name="ProjectDictionaryState">
   <dictionary name="hostuk">
     <words>
@@ -9,14 +8,14 @@
       <w>hostuk</w>
       <w>laravel</w>
       <w>livewire</w>
-      <w>middlewares</w>
       <w>mcp</w>
+      <w>middlewares</w>
       <w>multitenancy</w>
       <w>namespacing</w>
       <w>notifyhost</w>
       <w>oauth</w>
-      <w>pint</w>
       <w>phpstan</w>
+      <w>pint</w>
       <w>sanctum</w>
       <w>serializable</w>
       <w>socialhost</w>
