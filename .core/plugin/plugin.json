@@ -19,6 +19,11 @@
       "name": "package-status",
       "file": "skills/package-status.md",
       "description": "Show status of all packages in the workspace"
+    },
+    {
+      "name": "php-agent",
+      "file": "skills/php-agent.md",
+      "description": "Autonomous PHP development agent - picks up issues, implements, handles reviews, merges"
     }
   ],
 
