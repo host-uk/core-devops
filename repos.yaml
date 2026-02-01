@@ -123,6 +123,13 @@ repos:
     description: Starter template for new projects
     docs: false
 
+  # Claude Code plugin
+  core-claude:
+    type: meta
+    depends_on: []
+    description: Claude Code plugin for Host UK monorepo
+    docs: false
+
   # This repo (meta)
   core-devops:
     type: meta
