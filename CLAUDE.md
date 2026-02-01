@@ -53,12 +53,38 @@ See `.core/docs/core-folder-spec.md` for the full specification that each packag
 ```bash
 # macOS/Linux
 git clone git@github.com:host-uk/core-devops.git && cd core-devops && make setup
-
-# Windows (PowerShell as Admin)
-.\scripts\install-deps.ps1 && .\scripts\install-core.ps1 && core setup
 ```
 
-Environment variables for `install-core.sh`:
+### Windows Setup
+
+The `core` CLI is not yet available on Windows. Use these steps instead:
+
+```powershell
+# 1. Install dependencies (PowerShell as Admin)
+.\scripts\install-deps.ps1
+
+# 2. Authenticate GitHub CLI
+gh auth login -h github.com -p https -s workflow,repo,read:org,read:project,project
+
+# 3. Clone all repos
+.\scripts\clone-repos.ps1
+
+# 4. Enable PHP extensions (edit C:\tools\php84\php.ini, uncomment these):
+#    extension=curl
+#    extension=fileinfo
+#    extension=mbstring
+#    extension=openssl
+#    extension=pdo_sqlite
+
+# 5. Install and test a package
+cd packages/core-php
+composer install
+composer test
+```
+
+### Environment Variables (macOS/Linux)
+
+For `install-core.sh`:
 - `INSTALL_DIR` - Binary location (default: `~/.local/bin`)
 - `BUILD_FROM_SOURCE` - `true`, `false`, or `auto` (default: `auto`, tries binary then builds)
 
@@ -139,6 +165,12 @@ Defined in `repos.yaml`:
 - **"gh: command not found"** → `brew install gh && gh auth login -h github.com -p https -s workflow,repo,read:org,read:project,project`
 - **"refusing to allow..." or "missing required scopes"** → `gh auth refresh -h github.com -s workflow,read:project,project`
 - **Clone failures** → `ssh -T git@github.com` to verify SSH keys
+
+### Windows-Specific
+
+- **"openssl extension is required"** → Enable extensions in `C:\tools\php84\php.ini` (see setup above)
+- **"composer: command not found"** → Use PowerShell, not Git Bash: `powershell -Command "composer install"`
+- **core CLI not available** → Use `.\scripts\clone-repos.ps1` and work directly with composer
 
 ## This Repo's Scope
 

@@ -27,7 +27,7 @@ if ($PSVersionTable.PSVersion.Major -lt 4) {
 }
 
 $Repo = "host-uk/core"
-$Version = "v0.1.0"  # Pinned version - update when releasing new versions
+$Version = "main"  # Build from main until stable Windows releases are available
 $MinDiskSpaceMB = 100  # Minimum required disk space in MB
 
 function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Green }
@@ -144,7 +144,7 @@ function New-SecureDirectory {
     # Check parent directory for symlinks first
     $parent = Split-Path $Path -Parent
     if ($parent -and (Test-Path $parent)) {
-        Test-SecureDirectory -Path $parent
+        $null = Test-SecureDirectory -Path $parent
     }
 
     # Create directory
@@ -153,7 +153,7 @@ function New-SecureDirectory {
     }
 
     # Immediately verify it's not a symlink (minimize TOCTOU window)
-    Test-SecureDirectory -Path $Path
+    $null = Test-SecureDirectory -Path $Path
 
     return $Path
 }
@@ -181,10 +181,12 @@ function Set-SecureDirectoryAcl {
 
             # Add full control for current user only
             $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+            # Pre-calculate flags to avoid -bor compatibility issues across PowerShell versions
+            $inheritFlags = [System.Security.AccessControl.InheritanceFlags]([int][System.Security.AccessControl.InheritanceFlags]::ContainerInherit + [int][System.Security.AccessControl.InheritanceFlags]::ObjectInherit)
             $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
                 $currentUser,
                 [System.Security.AccessControl.FileSystemRights]::FullControl,
-                [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor [System.Security.AccessControl.InheritanceFlags]::ObjectInherit,
+                $inheritFlags,
                 [System.Security.AccessControl.PropagationFlags]::None,
                 [System.Security.AccessControl.AccessControlType]::Allow
             )
@@ -221,8 +223,8 @@ function Download-Binary {
     $tempExe = $null
 
     try {
-        # Create and verify install directory
-        New-SecureDirectory -Path $InstallDir
+        # Create and verify install directory (suppress output to avoid polluting return value)
+        $null = New-SecureDirectory -Path $InstallDir
 
         # Use a temp file in the same directory (same filesystem for atomic move)
         $tempExe = Join-Path $InstallDir "core.exe.tmp.$([System.Guid]::NewGuid().ToString('N').Substring(0,8))"
@@ -252,7 +254,7 @@ function Download-Binary {
         Test-FileHash -FilePath $tempExe -ExpectedHash $expectedHash
 
         # Re-verify directory hasn't been replaced with symlink (reduce TOCTOU window)
-        Test-SecureDirectory -Path $InstallDir
+        $null = Test-SecureDirectory -Path $InstallDir
 
         # Atomic move to final location (same filesystem)
         $finalPath = Join-Path $InstallDir "core.exe"
@@ -297,13 +299,19 @@ function Test-GitTagSignature {
     Push-Location $RepoPath
     try {
         # Attempt to verify the tag signature
-        $result = git tag -v $Tag 2>&1
-        if ($LASTEXITCODE -eq 0) {
+        # Use $ErrorActionPreference temporarily to prevent stderr from throwing
+        $oldErrorAction = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $result = git tag -v $Tag 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+        $ErrorActionPreference = $oldErrorAction
+
+        if ($exitCode -eq 0) {
             Write-Info "GPG signature verified for tag $Tag"
             return $true
         } else {
             # Check if tag is unsigned vs signature invalid
-            if ($result -match "error: no signature found") {
+            if ($result -match "no signature found" -or $result -match "cannot verify a non-tag") {
                 Write-Warn "Tag $Tag is not signed - continuing without signature verification"
                 return $true
             } else {
@@ -326,10 +334,10 @@ function Build-FromSource {
 
     # Create secure temp directory with restrictive ACL
     $tmpdir = Join-Path ([System.IO.Path]::GetTempPath()) "core-build-$([System.Guid]::NewGuid().ToString('N'))"
-    New-SecureDirectory -Path $tmpdir
+    $null = New-SecureDirectory -Path $tmpdir
 
     # ACL is REQUIRED for temp build directories (security critical)
-    Set-SecureDirectoryAcl -Path $tmpdir -Required
+    $null = Set-SecureDirectoryAcl -Path $tmpdir -Required
 
     try {
         Write-Info "Cloning $Repo (version $Version)..."
@@ -341,22 +349,52 @@ function Build-FromSource {
             Write-Err "Failed to clone repository at version $Version"
         }
 
-        # Verify GPG signature on tag (if available)
-        Test-GitTagSignature -RepoPath $cloneDir -Tag $Version
+        # Verify GPG signature on tag (if available, skip for branches)
+        if ($Version -match "^v\d") {
+            $null = Test-GitTagSignature -RepoPath $cloneDir -Tag $Version
+        } else {
+            Write-Warn "Building from branch '$Version' - GPG verification skipped (only applies to tags)"
+        }
 
         Write-Info "Building core CLI..."
         Push-Location $cloneDir
         try {
-            go build -o core.exe .
-            if ($LASTEXITCODE -ne 0) {
-                Write-Err "Go build failed"
+            # Explicitly set GOOS/GOARCH to ensure Windows build
+            $env:GOOS = "windows"
+            $env:GOARCH = "amd64"
+
+            $oldErrorAction = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            $buildOutput = go build -o core.exe . 2>&1 | Out-String
+            $buildExitCode = $LASTEXITCODE
+            $ErrorActionPreference = $oldErrorAction
+
+            if ($buildExitCode -ne 0) {
+                # Check for Windows-specific build issues
+                if ($buildOutput -match "Setpgid|Getpgid|syscall\.Kill|undefined.*syscall") {
+                    Write-Warn "Build failed: core CLI uses Unix-specific syscalls not available on Windows."
+                    Write-Warn ""
+                    Write-Warn "Options:"
+                    Write-Warn "  1. Wait for pre-built Windows binaries in GitHub releases"
+                    Write-Warn "  2. Use WSL (Windows Subsystem for Linux) for development"
+                    Write-Warn "  3. Work directly with composer in packages/ (core CLI is optional)"
+                    Write-Warn ""
+                    Write-Warn "For PHP development, you can use composer directly:"
+                    Write-Warn "  cd packages/core-php && composer test"
+                    Write-Host ""
+                    # Don't use Write-Err here - exit gracefully
+                    exit 0
+                } else {
+                    Write-Host $buildOutput
+                    Write-Err "Go build failed"
+                }
             }
         } finally {
             Pop-Location
         }
 
         # Create and verify install directory
-        New-SecureDirectory -Path $InstallDir
+        $null = New-SecureDirectory -Path $InstallDir
 
         # Move built binary to install location
         Move-Item (Join-Path $cloneDir "core.exe") (Join-Path $InstallDir "core.exe") -Force
@@ -427,7 +465,7 @@ function Main {
     Write-Info "Installing Core CLI (version $Version)..."
 
     # Check disk space before starting
-    Test-DiskSpace -Path $InstallDir
+    $null = Test-DiskSpace -Path $InstallDir
 
     # Try download first, fallback to build
     if (-not (Download-Binary)) {
