@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/host-uk/core-devops/discussions
+    about: Ask questions and discuss ideas
+  - name: Security Issues
+    url: https://github.com/host-uk/core-devops/security/policy
+    about: Report security vulnerabilities privately

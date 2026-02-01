@@ -1,0 +1,10 @@
+# Default owners for everything
+* @host-uk/core-maintainers
+
+# Scripts and CI
+/scripts/ @host-uk/devops
+/.github/ @host-uk/devops
+
+# Documentation
+*.md @host-uk/docs
+/docs/ @host-uk/docs
