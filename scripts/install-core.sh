@@ -21,9 +21,23 @@ set -e
 # - No TLS certificate pinning (relies on system CA store)
 
 REPO="host-uk/core"
-VERSION="v0.1.0"  # Pinned version - update when releasing new versions
+VERSION="${CORE_VERSION:-latest}"  # Use latest release, or set CORE_VERSION=dev for dev builds
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 BUILD_FROM_SOURCE="${BUILD_FROM_SOURCE:-auto}"
+
+# Resolve "latest" to actual release tag
+resolve_version() {
+    if [[ "$VERSION" == "latest" ]]; then
+        if has gh; then
+            VERSION=$(gh release view --repo "$REPO" --json tagName -q '.tagName' 2>/dev/null) || VERSION="dev"
+        elif has curl; then
+            VERSION=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | head -1 | cut -d'"' -f4) || VERSION="dev"
+        else
+            VERSION="dev"
+        fi
+        info "Resolved latest version: $VERSION"
+    fi
+}
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -75,7 +89,8 @@ verify_hash() {
 
     actual_hash=$(compute_sha256 "$file")
 
-    if [[ "${actual_hash,,}" != "${expected_hash,,}" ]]; then
+    # Case-insensitive compare (bash 3 compatible)
+    if [[ "$(echo "$actual_hash" | tr '[:upper:]' '[:lower:]')" != "$(echo "$expected_hash" | tr '[:upper:]' '[:lower:]')" ]]; then
         rm -f "$file"
         error "Hash verification failed! Expected: $expected_hash, Got: $actual_hash. The downloaded file may be corrupted or tampered with."
     fi
@@ -282,6 +297,7 @@ verify() {
 }
 
 main() {
+    resolve_version
     info "Installing Core CLI (version $VERSION)..."
 
     # Verify install directory is safe before starting

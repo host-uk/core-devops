@@ -32,7 +32,7 @@ You're now ready to develop. The workspace starts with `core-php` as the active 
 core doctor
 
 # See workspace status
-core health
+core dev health
 
 # Run tests in the active package (core-php)
 core php test

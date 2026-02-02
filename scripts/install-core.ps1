@@ -29,6 +29,23 @@ if ($PSVersionTable.PSVersion.Major -lt 4) {
 $Repo = "host-uk/core"
 $MinDiskSpaceMB = 100  # Minimum required disk space in MB
 
+# Resolve latest release version from GitHub API
+function Get-LatestVersion {
+    try {
+        if (Test-Command gh) {
+            $version = gh release view --repo $Repo --json tagName -q '.tagName' 2>$null
+            if ($version) { return $version }
+        }
+
+        # Fallback to GitHub API
+        $response = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -UseBasicParsing
+        if ($response.tag_name) { return $response.tag_name }
+    } catch {
+        Write-Warn "Could not determine latest version, using default branch"
+    }
+    return $null
+}
+
 function Write-Info { Write-Host "[INFO] $args" -ForegroundColor Green }
 function Write-Warn { Write-Host "[WARN] $args" -ForegroundColor Yellow }
 function Write-Err { Write-Host "[ERROR] $args" -ForegroundColor Red; exit 1 }
@@ -339,11 +356,23 @@ function Build-FromSource {
     $null = Set-SecureDirectoryAcl -Path $tmpdir -Required
 
     try {
+        # Resolve latest version for reproducible builds
+        $version = Get-LatestVersion
+        if ($version) {
+            Write-Info "Resolved latest version: $version"
+        } else {
+            Write-Warn "Building from default branch (version unknown)"
+        }
+
         Write-Info "Cloning $Repo..."
         $cloneDir = Join-Path $tmpdir "Core"
 
-        # Clone default branch
-        git clone --depth 1 "https://github.com/$Repo.git" $cloneDir
+        # Clone specific version if available, otherwise default branch
+        if ($version) {
+            git clone --depth 1 --branch $version "https://github.com/$Repo.git" $cloneDir
+        } else {
+            git clone --depth 1 "https://github.com/$Repo.git" $cloneDir
+        }
         if ($LASTEXITCODE -ne 0) {
             Write-Err "Failed to clone repository"
         }

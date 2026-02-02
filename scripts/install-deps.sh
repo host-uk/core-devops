@@ -44,7 +44,8 @@ verify_hash() {
 
     actual_hash=$(compute_sha256 "$file")
 
-    if [[ "${actual_hash,,}" != "${expected_hash,,}" ]]; then
+    # Case-insensitive compare (bash 3 compatible)
+    if [[ "$(echo "$actual_hash" | tr '[:upper:]' '[:lower:]')" != "$(echo "$expected_hash" | tr '[:upper:]' '[:lower:]')" ]]; then
         rm -f "$file"
         error "Hash verification failed! Expected: $expected_hash, Got: $actual_hash"
     fi
