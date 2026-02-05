@@ -5,7 +5,28 @@ org: host-uk
 base_path: ./packages
 
 repos:
-  # Foundation
+  # Go Foundation
+  core:
+    type: foundation
+    description: Core CLI framework - multi-repo management, MCP server, io.Medium
+    docs: true
+    ci: github-actions
+
+  core-gui:
+    type: module
+    depends_on: [core]
+    description: Desktop GUI shell for core CLI (Wails v3)
+    docs: false
+    ci: github-actions
+
+  build:
+    type: meta
+    depends_on: []
+    description: GitHub Action for building Wails apps, multi-platform releases
+    docs: false
+    ci: github-actions
+
+  # PHP Foundation
   core-php:
     type: foundation
     description: Core PHP framework - events, modules, lifecycle
@@ -122,6 +143,21 @@ repos:
     depends_on: []
     description: Starter template for new projects
     docs: false
+
+  # Infrastructure
+  core-images:
+    type: meta
+    depends_on: []
+    description: Container images for Host UK services
+    docs: false
+    ci: github-actions
+
+  core-agent:
+    type: module
+    depends_on: [core]
+    description: Agent framework for distributed task execution
+    docs: false
+    ci: github-actions
 
   # Claude Code plugin
   core-claude:
