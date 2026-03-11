@@ -27,7 +27,7 @@ jobs:
           semgrep scan --config auto --sarif --output semgrep.sarif || true
           
       - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: semgrep.sarif
         if: always()
@@ -50,7 +50,7 @@ jobs:
         continue-on-error: true
           
       - name: Upload Trivy SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy.sarif
         if: always()
@@ -87,7 +87,7 @@ jobs:
         continue-on-error: true
             
       - name: Upload OSV SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: osv.sarif
         if: always()
@@ -109,7 +109,7 @@ jobs:
         continue-on-error: true
           
       - name: Upload Checkov SARIF
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: checkov.sarif
         if: always()
